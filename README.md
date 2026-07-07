@@ -37,28 +37,45 @@ In traditional DeFi, tokenized RWA assets (like invoices or real estate) suffer 
 
 ---
 
-## Why Wardens Protocol?
+## Why It Matters
 
-Traditional RWA protocols trust static, single-point oracles. Wardens creates a live verification economy where:
+Current RWA protocols trust collateral based on one-time verification.
 
-*   **✓ Verifiers compete** to earn fees by completing off-chain asset checks.
-*   **✓ Challengers monitor** posted trust scores against public sources of truth.
-*   **✓ Dishonest reports are slashed** automatically using on-chain bonds.
-*   **✓ Lending vaults react instantly** to adjust credit capacity.
+Wardens Protocol introduces continuous verification through an adversarial market of autonomous agents.
 
-No manual governance. No stale collateral. Trust becomes an economic incentive.
+Instead of assuming trust, the protocol continuously earns it.
+
+This transforms collateral from static trust into continuously verified trust.
+
+---
+
+## Why Casper?
+
+Wardens Protocol relies on Casper to provide economically secure, upgradeable trust infrastructure for Real-World Assets.
+
+Casper enables:
+*   **Native On-chain Staking and Slashing**: Enforces verifier accountability with immutable bond locking.
+*   **Upgradeable Smart Contracts via Odra**: Allows the protocol to adapt to evolving RWA standards.
+*   **Deterministic Execution**: Ensures predictable outcomes for critical financial credit state transitions.
+*   **Transparent, Auditable Verification History**: Builds a public log of verifications, disputes, and resolutions.
+*   **Secure Settlement**: Safely settles trust score updates and lending status updates.
+
+These capabilities make Casper the trust layer that continuously secures RWA collateral throughout its lifecycle.
 
 ---
 
 ## 📈 Repository Statistics
 
-*   **5** Autonomous Agents (Parser, Fraud, Registry, Aggregator, Challenger)
-*   **1** Smart Contract (Unified `WardensCore` deployed on Casper Testnet)
-*   **12** Passing Contract Unit Tests
-*   **8** Testnet Transactions verified in the demo loop
-*   **3** Demo Assets (`INV-001` healthy, `INV-002` duplicate, `INV-003` slashed)
-*   **100%** On-chain Slashing and Collateral Freezing
-*   **Real** x402 Micropayments handshake over HTTP
+| Feature | Detail |
+| :--- | :--- |
+| 🛡 **5 Autonomous Agents** | Parser, Fraud, Registry, Aggregator, Challenger |
+| ⚖ **On-chain Challenge Court** | Live dispute resolution and bond slashing |
+| 💸 **x402 Payments** | HTTP-native micropayment verification fees |
+| 🏦 **Dynamic Lending Vault** | Dynamic LTV adjustments responding to collateral health |
+| ⚡ **Casper Testnet Deployment** | Live execution and transaction trail |
+| ✅ **12 Smart Contract Tests** | Comprehensive contract unit test coverage |
+| 📜 **Verified Transactions** | End-to-end chain proof logged |
+| 🖥 **Interactive Dashboard** | Real-time neobrutalist monitoring console |
 
 ---
 
@@ -84,6 +101,18 @@ Verifier Slashed & Collateral Frozen (LTV 0%)
 
 ---
 
+## 📸 Dashboard Screenshots
+
+### Active Challenge Court
+*Live Challenge Court page displaying active disputes, verifier/challenger agents involved, and on-chain action buttons:*
+![Active Challenge Court](docs/challenge_court.png)
+
+### Frozen Collateral State
+*Dashboard displaying the frozen status of an asset after a fraudulent score has been successfully slashed:*
+![Frozen Collateral State](docs/dashboard_frozen.png)
+
+---
+
 ## 📋 Features
 
 *   **✅ Casper Testnet Deployment**: Deployed on `casper-test` network.
@@ -98,7 +127,55 @@ Verifier Slashed & Collateral Frozen (LTV 0%)
 
 ---
 
+## 💡 Key Innovations
+
+*   **Continuous RWA Verification**: Continuous health checks replace static audits.
+*   **Autonomous Verifier Economy**: Off-chain agents perform specialized validations.
+*   **Economic Trust Incentives**: Staking aligned with verifier performance.
+*   **Native x402 Micropayments**: Native payment handshakes for execution.
+*   **Dynamic Collateral Valuation**: Real-time adjustment of credit capacity (LTV).
+*   **Adversarial Challenge Protocol**: Incentivized challengers monitor and flag dishonesty.
+*   **On-chain Slashing**: Casper smart contract penalty enforcement.
+*   **Trust-Aware Lending**: Direct linking between collateral validation and loan limits.
+
+---
+
+## 🛡️ Security Model
+
+Wardens Protocol aligns incentives through economic penalties:
+
+```
+Verifier Submits Score
+       ↓
+Verifier Bond Locked
+       ↓
+Challenge Window Opens
+       ↓
+Evidence Reviewed (by Challenger)
+       ↓
+Honest → Reward Issued
+Dishonest → Slash Bond
+       ↓
+Vault Updates Collateral Status
+```
+
+---
+
+## ⚖️ Protocol Guarantees
+
+Wardens Protocol guarantees that:
+
+*   **✓ Every trust score is attributable** to the verifier who signed it.
+*   **✓ Every verifier stakes collateral** (bond) before posting scores.
+*   **✓ Every dispute is auditable** transparently on-chain.
+*   **✓ Every slash is executed on-chain** based on verified evidence.
+*   **✓ Every lending decision reflects the latest verified state** of the collateral.
+
+---
+
 ## 📐 System Architecture
+
+![Wardens Protocol Architecture](docs/architecture.png)
 
 ```mermaid
 graph TD
@@ -164,8 +241,7 @@ The protocol contracts and demo operations are deployed and active on the Casper
 
 ## ⚙️ Quick Start & Local Run
 
-> 📖 **Full step-by-step replication guide (local, custom agents, and testnet deploy):
-> [SETUP.md](SETUP.md).**
+> 📖 **Full step-by-step replication guide (local, custom agents, and testnet deploy): [SETUP.md](SETUP.md).**
 
 ### Prerequisites
 *   [Bun](https://bun.sh)
@@ -236,9 +312,23 @@ This includes:
 
 ---
 
+## 🛡️ What This Repository Demonstrates
+
+*   **✓ Casper smart contract** deployed to Testnet
+*   **✓ Real transaction history** mapped on-chain
+*   **✓ Autonomous verifier agents** checking RWA status
+*   **✓ x402 payment protocol** live verification gating
+*   **✓ Dynamic lending vault** reacting to collateral scores
+*   **✓ On-chain dispute resolution** via the Challenge Court
+*   **✓ Bond slashing** for fraudulent reports
+*   **✓ Interactive dashboard** neobrutalist client
+*   **✓ Complete end-to-end** protocol demonstration
+
+---
+
 ## 👁️ Vision
 
-> Wardens Protocol transforms RWA verification from a one-time audit into a continuous, adversarial security market—where trust is earned, monitored, and economically enforced on Casper.
+> Wardens Protocol turns trust from a one-time assumption into a continuously verified economic market. Autonomous agents compete to earn trust, challengers protect the network from fraud, and Casper enforces accountability through transparent, on-chain incentives. Every loan reflects the current state of reality—not yesterday's audit.
 
 ---
 
