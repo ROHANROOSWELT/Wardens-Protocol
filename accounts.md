@@ -2,7 +2,7 @@
 
 ## Live deployment (casper-test)
 
-- **WardensCore contract package:** `contract-package-75bf977a36437c2de44a4a74a3488c43ac6918b74f9f39c8a63c00e83b201af2`
+- **WardensCore contract package:** `contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de`
 - **Admin / deployer account:** `entity-account-b569d04d8d3e99c7fc44679d0ae3d7a430a7b13282c04cdc4c1db885d6e38fd9`
 
 For the Qualification demo, a single funded admin wallet signs every transaction (it is

@@ -12,16 +12,16 @@ It's organized in three levels. Do only as much as you need:
 
 There is also an **already-live contract** on Casper Testnet you can inspect without
 deploying anything:
-`contract-package-75bf977a36437c2de44a4a74a3488c43ac6918b74f9f39c8a63c00e83b201af2`
-(explorer: <https://testnet.cspr.live/contract-package/75bf977a36437c2de44a4a74a3488c43ac6918b74f9f39c8a63c00e83b201af2>).
+`contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de`
+(explorer: <https://testnet.cspr.live/contract-package/ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de>).
 
 ---
 
 ## 0. Clone
 
 ```bash
-git clone git@github.com:ChaseBP/warden-protocol.git
-cd warden-protocol           # (the project root; called "repo root" below)
+git clone https://github.com/ROHANROOSWELT/Wardens-Protocol.git
+cd Wardens-Protocol           # (the project root; called "repo root" below)
 ```
 
 Repo layout:

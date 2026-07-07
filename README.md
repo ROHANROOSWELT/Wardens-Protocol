@@ -1,6 +1,10 @@
 # Wardens Protocol
 
 <p align="center">
+  <img src="docs/wardens_logo.png" width="250" alt="Wardens Protocol Logo">
+</p>
+
+<p align="center">
   <img src="docs/hero_animation.gif" width="900" alt="Wardens Protocol Hero Animation">
 </p>
 
@@ -18,9 +22,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ChaseBP/warden-protocol/blob/main/PROOF.md">📜 Testnet Proof</a> •
+  <a href="https://github.com/ROHANROOSWELT/Wardens-Protocol/blob/main/PROOF.md">📜 Testnet Proof</a> •
   <a href="https://testnet.cspr.live/transaction/89ee2b761ad1a82fbaa70558e4eb6e03dba5ae3e51aba5acade8456380a41082">🔗 Deploy Tx</a> •
-  <a href="https://testnet.cspr.live/contract-package/75bf977a36437c2de44a4a74a3488c43ac6918b74f9f39c8a63c00e83b201af2">🔗 Casper Explorer</a>
+  <a href="https://testnet.cspr.live/contract-package/ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de">🔗 Casper Explorer</a>
 </p>
 
 ***
@@ -139,7 +143,7 @@ The protocol contracts and demo operations are deployed and active on the Casper
 (`casper-test`, Casper 2.0). Every hash is a real transaction — verify at
 `https://testnet.cspr.live/transaction/<hash>`. Full list in [PROOF.md](PROOF.md).
 
-*   **Contract Package Hash**: `contract-package-75bf977a36437c2de44a4a74a3488c43ac6918b74f9f39c8a63c00e83b201af2`
+*   **Contract Package Hash**: `contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de`
 *   **Deploy WardensCore**: `89ee2b761ad1a82fbaa70558e4eb6e03dba5ae3e51aba5acade8456380a41082`
 
 ### Transaction Log
