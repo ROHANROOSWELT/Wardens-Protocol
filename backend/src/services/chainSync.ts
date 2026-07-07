@@ -16,14 +16,23 @@ const CONTRACT_DIR = `${ROOT}/contracts/wardens_core`;
 const BIN = `${CONTRACT_DIR}/target/debug/wardens_livenet`;
 const STATE_FILE = `${ROOT}/scripts/.chain_state`;
 
+function formatAddress(addr: string): string {
+  if (addr.startsWith("hash-")) {
+    return addr.replace("hash-", "contract-package-");
+  }
+  return addr;
+}
+
 /** Deployed contract address: env override, else scripts/.chain_state. */
 export function contractAddress(): string {
-  if (process.env.WARDENS_CORE_ADDRESS) return process.env.WARDENS_CORE_ADDRESS;
-  if (existsSync(STATE_FILE)) {
+  let addr = "";
+  if (process.env.WARDENS_CORE_ADDRESS) {
+    addr = process.env.WARDENS_CORE_ADDRESS;
+  } else if (existsSync(STATE_FILE)) {
     const m = readFileSync(STATE_FILE, "utf8").match(/WARDENS_CORE_ADDRESS=(.+)/);
-    if (m) return m[1].trim();
+    if (m) addr = m[1].trim();
   }
-  return "";
+  return formatAddress(addr);
 }
 
 interface DumpData {
@@ -87,9 +96,17 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
   if (!existsSync(BIN)) return Promise.resolve({ ok: false, error: `livenet executor not built at ${BIN} — run: cargo build --features livenet --bin wardens_livenet` });
 
   return new Promise((resolve) => {
+    const envs = {
+      ...process.env,
+      WARDENS_CORE_ADDRESS: addr,
+      ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "",
+      ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "",
+      ODRA_CASPER_LIVENET_SECRET_KEY_PATH: process.env.ODRA_CASPER_LIVENET_SECRET_KEY_PATH || process.env.BACKEND_PRIVATE_KEY_PATH || "",
+      ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "",
+    };
     const child = spawn(BIN, ["dump", assetId], {
       cwd: CONTRACT_DIR,
-      env: { ...process.env, WARDENS_CORE_ADDRESS: addr },
+      env: envs,
     });
     let out = "";
     let err = "";

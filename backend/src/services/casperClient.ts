@@ -13,6 +13,9 @@
 // 600s staleness, challenge slash/reward. Keeping them in lockstep means the
 // demo behaves the same whether or not a node is attached.
 import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 import { ltvForScore, statusForScore, type AssetStatus } from "./scoreEngine.ts";
 
 const STALENESS_WINDOW_SECONDS = 600;
@@ -81,6 +84,61 @@ export interface VaultPosition {
   frozen: boolean;
 }
 
+const ROOT = fileURLToPath(new URL("../../..", import.meta.url)); // repo root
+const CONTRACT_DIR = `${ROOT}/contracts/wardens_core`;
+const BIN = `${CONTRACT_DIR}/target/debug/wardens_livenet`;
+const MODE = process.env.WARDENS_MODE ?? "sim";
+
+function formatAddress(addr: string): string {
+  if (addr.startsWith("hash-")) {
+    return addr.replace("hash-", "contract-package-");
+  }
+  return addr;
+}
+
+function getLivenetEnv() {
+  const addr = process.env.WARDENS_CORE_ADDRESS || process.env.WARDENS_CORE_HASH || "";
+  const formattedAddr = formatAddress(addr);
+  return {
+    ...process.env,
+    WARDENS_CORE_ADDRESS: formattedAddr,
+    ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "",
+    ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "",
+    ODRA_CASPER_LIVENET_SECRET_KEY_PATH: process.env.ODRA_CASPER_LIVENET_SECRET_KEY_PATH || process.env.BACKEND_PRIVATE_KEY_PATH || "",
+    ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "",
+  };
+}
+
+function runLivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string; deployHash: string }> {
+  return new Promise((resolve, reject) => {
+    if (!existsSync(BIN)) {
+      return reject(new Error(`livenet executor not built at ${BIN} — run cargo build --features livenet --bin wardens_livenet`));
+    }
+    const envs = getLivenetEnv();
+    const child = spawn(BIN, args, {
+      cwd: CONTRACT_DIR,
+      env: envs,
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (d) => (stdout += d));
+    child.stderr.on("data", (d) => (stderr += d));
+    child.on("error", (e) => reject(e));
+    child.on("close", (code) => {
+      if (code !== 0) {
+        return reject(new Error(`Command failed (exit ${code}): ${stderr || stdout}`));
+      }
+      const combined = stdout + "\n" + stderr;
+      const match =
+        combined.match(/(?:deploy|transaction)\/([a-fA-F0-9]{64})/i) ||
+        combined.match(/(?:deploy|transaction) hash:?\s*([a-fA-F0-9]{64})/i) ||
+        combined.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i);
+      const deployHash = match ? match[1] : `tx-${Date.now()}`;
+      resolve({ stdout, stderr, deployHash });
+    });
+  });
+}
+
 class WardensCoreSim {
   assets = new Map<string, Asset>();
   agents = new Map<string, Agent>();
@@ -115,14 +173,37 @@ class WardensCoreSim {
     return tx;
   }
 
-  createAsset(a: {
+  async createAsset(a: {
     asset_id: string;
     issuer: string;
     debtor: string;
     face_value: number;
     due_date: number;
     evidence_hash: string;
-  }): TxRecord {
+  }): Promise<TxRecord> {
+    if (MODE === "chain") {
+      const { deployHash } = await runLivenetCmd([
+        "create_asset",
+        a.asset_id,
+        a.issuer,
+        a.debtor,
+        a.face_value.toString(),
+        a.due_date.toString(),
+        a.evidence_hash,
+      ]);
+      const { syncAssetFromChain } = await import("./chainSync.ts");
+      await syncAssetFromChain(a.asset_id);
+      
+      const tx: TxRecord = {
+        action: "create_asset",
+        deploy_hash: deployHash,
+        result: `Asset ${a.asset_id} created`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(tx);
+      return tx;
+    }
+
     if (this.assets.has(a.asset_id)) throw new Error("AssetAlreadyExists");
     const now = this.now();
     this.assets.set(a.asset_id, {
@@ -135,7 +216,26 @@ class WardensCoreSim {
     return this.record("create_asset", a, `Asset ${a.asset_id} created`);
   }
 
-  registerAgent(agent_id: string, role: string): TxRecord {
+  async registerAgent(agent_id: string, role: string): Promise<TxRecord> {
+    if (MODE === "chain") {
+      const { deployHash } = await runLivenetCmd([
+        "register_agent",
+        agent_id,
+        role.toLowerCase(),
+      ]);
+      const { syncAssetFromChain } = await import("./chainSync.ts");
+      await syncAssetFromChain("");
+      
+      const tx: TxRecord = {
+        action: "register_agent",
+        deploy_hash: deployHash,
+        result: `Agent ${agent_id} registered`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(tx);
+      return tx;
+    }
+
     if (this.agents.has(agent_id)) throw new Error("AgentAlreadyRegistered");
     this.agents.set(agent_id, {
       agent_id,
@@ -150,20 +250,64 @@ class WardensCoreSim {
     return this.record("register_agent", { agent_id, role }, `Agent ${agent_id} registered`);
   }
 
-  postBond(agent_id: string, amount: number): TxRecord {
+  async postBond(agent_id: string, amount: number): Promise<TxRecord> {
+    if (MODE === "chain") {
+      const { deployHash } = await runLivenetCmd([
+        "post_bond",
+        agent_id,
+        amount.toString(),
+      ]);
+      const { syncAssetFromChain } = await import("./chainSync.ts");
+      await syncAssetFromChain("");
+      
+      const tx: TxRecord = {
+        action: "post_bond",
+        deploy_hash: deployHash,
+        result: `Bond ${amount} locked`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(tx);
+      return tx;
+    }
+
     const agent = this.mustAgent(agent_id);
     agent.bonded_amount += amount;
     agent.active = true;
     return this.record("post_bond", { agent_id, amount }, `Bond ${amount} locked`);
   }
 
-  submitScore(s: {
+  async submitScore(s: {
     asset_id: string;
     score: number;
     agent_id: string;
     evidence_hash: string;
     explanation_hash: string;
-  }): TxRecord & { score_id: number } {
+  }): Promise<TxRecord & { score_id: number }> {
+    if (MODE === "chain") {
+      const { stdout, deployHash } = await runLivenetCmd([
+        "submit_score",
+        s.asset_id,
+        s.score.toString(),
+        s.agent_id,
+        s.evidence_hash,
+        s.explanation_hash,
+      ]);
+      const scoreIdMatch = stdout.match(/SCORE_ID=(\d+)/);
+      const score_id = scoreIdMatch ? Number(scoreIdMatch[1]) : 0;
+      
+      const { syncAssetFromChain } = await import("./chainSync.ts");
+      await syncAssetFromChain(s.asset_id);
+      
+      const tx: TxRecord = {
+        action: "submit_score",
+        deploy_hash: deployHash,
+        result: `Score ${s.score}`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(tx);
+      return { ...tx, score_id };
+    }
+
     if (s.score > 100) throw new Error("InvalidScore");
     const agent = this.mustAgent(s.agent_id);
     if (!agent.active || agent.bonded_amount <= 0) throw new Error("AgentNotBonded");
@@ -218,7 +362,26 @@ class WardensCoreSim {
     this.record("freeze_asset", { asset_id, reason }, `Frozen: ${reason}`);
   }
 
-  depositCollateral(asset_id: string, collateral_value: number): TxRecord {
+  async depositCollateral(asset_id: string, collateral_value: number): Promise<TxRecord> {
+    if (MODE === "chain") {
+      const { deployHash } = await runLivenetCmd([
+        "deposit_collateral",
+        asset_id,
+        collateral_value.toString(),
+      ]);
+      const { syncAssetFromChain } = await import("./chainSync.ts");
+      await syncAssetFromChain(asset_id);
+      
+      const tx: TxRecord = {
+        action: "deposit_collateral",
+        deploy_hash: deployHash,
+        result: `Collateral ${collateral_value}`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(tx);
+      return tx;
+    }
+
     const asset = this.mustAsset(asset_id);
     const ltv = ltvForScore(asset.current_score);
     this.positions.set(asset_id, {
@@ -244,7 +407,26 @@ class WardensCoreSim {
     return ltvForScore(asset.current_score);
   }
 
-  borrow(asset_id: string, amount: number): TxRecord {
+  async borrow(asset_id: string, amount: number): Promise<TxRecord> {
+    if (MODE === "chain") {
+      const { deployHash } = await runLivenetCmd([
+        "borrow",
+        asset_id,
+        amount.toString(),
+      ]);
+      const { syncAssetFromChain } = await import("./chainSync.ts");
+      await syncAssetFromChain(asset_id);
+      
+      const tx: TxRecord = {
+        action: "borrow",
+        deploy_hash: deployHash,
+        result: `Borrowed ${amount}`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(tx);
+      return tx;
+    }
+
     const asset = this.mustAsset(asset_id);
     const pos = this.positions.get(asset_id);
     if (!pos) throw new Error("VaultPositionNotFound");
@@ -259,12 +441,38 @@ class WardensCoreSim {
     return this.record("borrow", { asset_id, amount }, `Borrowed ${amount}`);
   }
 
-  openChallenge(c: {
+  async openChallenge(c: {
     score_id: number;
     challenger_agent_id: string;
     counter_evidence_hash: string;
     counter_bond: number;
-  }): TxRecord & { challenge_id: number } {
+  }): Promise<TxRecord & { challenge_id: number }> {
+    if (MODE === "chain") {
+      const { stdout, deployHash } = await runLivenetCmd([
+        "open_challenge",
+        c.score_id.toString(),
+        c.challenger_agent_id,
+        c.counter_evidence_hash,
+        c.counter_bond.toString(),
+      ]);
+      const challengeIdMatch = stdout.match(/CHALLENGE_ID=(\d+)/);
+      const challenge_id = challengeIdMatch ? Number(challengeIdMatch[1]) : 0;
+      
+      const { syncAssetFromChain } = await import("./chainSync.ts");
+      const score = this.scores.get(c.score_id);
+      const assetId = score ? score.asset_id : "";
+      await syncAssetFromChain(assetId);
+      
+      const tx: TxRecord = {
+        action: "open_challenge",
+        deploy_hash: deployHash,
+        result: `Challenge ${challenge_id} opened`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(tx);
+      return { ...tx, challenge_id };
+    }
+
     const score = this.scores.get(c.score_id);
     if (!score) throw new Error("ScoreNotFound");
     if (this.now() > score.challenge_deadline) throw new Error("ChallengeWindowClosed");
@@ -290,7 +498,28 @@ class WardensCoreSim {
     return { ...tx, challenge_id };
   }
 
-  resolveChallenge(challenge_id: number, upheld: boolean): TxRecord {
+  async resolveChallenge(challenge_id: number, upheld: boolean): Promise<TxRecord> {
+    if (MODE === "chain") {
+      const { deployHash } = await runLivenetCmd([
+        "resolve_challenge",
+        challenge_id.toString(),
+        upheld.toString(),
+      ]);
+      const { syncAssetFromChain } = await import("./chainSync.ts");
+      const ch = this.challenges.get(challenge_id);
+      const assetId = ch ? ch.asset_id : "";
+      await syncAssetFromChain(assetId);
+      
+      const tx: TxRecord = {
+        action: "resolve_challenge",
+        deploy_hash: deployHash,
+        result: upheld ? "Verifier slashed" : "Challenger slashed",
+        timestamp: Date.now(),
+      };
+      this.txs.push(tx);
+      return tx;
+    }
+
     const ch = this.challenges.get(challenge_id);
     if (!ch) throw new Error("ChallengeNotFound");
     if (ch.status !== "Open") throw new Error("ChallengeAlreadyResolved");
@@ -324,7 +553,7 @@ class WardensCoreSim {
     return this.record("resolve_challenge", { challenge_id, upheld }, upheld ? "Verifier slashed" : "Challenger slashed");
   }
 
-  releaseBond(agent_id: string): TxRecord {
+  async releaseBond(agent_id: string): Promise<TxRecord> {
     const agent = this.mustAgent(agent_id);
     agent.bonded_amount = 0;
     agent.active = false;
@@ -343,19 +572,14 @@ class WardensCoreSim {
   }
 }
 
-const MODE = process.env.WARDENS_MODE ?? "sim";
 const sim = new WardensCoreSim();
 
 if (MODE === "chain") {
-  // Real-chain path: deploys go through scripts/deploy.sh + casper-client using
-  // WARDENS_CORE_HASH and BACKEND_PRIVATE_KEY_PATH. For the Qualification build
-  // the backend still tracks state in `sim` as a read model; extend here to
-  // parse CSPR.cloud deploy results into the same records. Documented in PROOF.md.
   console.warn(
-    "[casperClient] WARDENS_MODE=chain: submitting via deploy scripts is expected; " +
-      "backend keeps an in-memory read model in sync. See PROOF.md."
+    "[casperClient] WARDENS_MODE=chain: submitting via livenet CLI executor directly to the blockchain."
   );
 }
 
 export const casper = sim;
 export type CasperClient = WardensCoreSim;
+

@@ -35,7 +35,7 @@ export default function Landing() {
           </h1>
           <p className="reveal reveal-3 text-body-lg text-on-surface-variant max-w-[600px]">
             Verifier agents score collateral, challengers catch liars, and bad agents get{" "}
-            <span className="font-bold text-error underline decoration-wavy decoration-2 underline-offset-4">
+            <span className="font-bold text-error">
               slashed on-chain
             </span>{" "}
             — on Casper.

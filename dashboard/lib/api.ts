@@ -6,9 +6,14 @@ export const EXPLORER =
   process.env.NEXT_PUBLIC_CASPER_EXPLORER_BASE ?? "https://testnet.cspr.live/deploy";
 
 export async function getDashboard(assetId: string) {
-  const res = await fetch(`${BACKEND}/api/dashboard/${assetId}`, { cache: "no-store" });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${BACKEND}/api/dashboard/${assetId}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.error("getDashboard failed", err);
+    return null;
+  }
 }
 
 export async function post(path: string, body: unknown) {
@@ -21,6 +26,9 @@ export async function post(path: string, body: unknown) {
 }
 
 export function explorerLink(hash: string): string {
+  if (/^[a-fA-F0-9]{64}$/.test(hash)) {
+    return `https://testnet.cspr.live/transaction/${hash}`;
+  }
   return `${EXPLORER}/${hash}`;
 }
 

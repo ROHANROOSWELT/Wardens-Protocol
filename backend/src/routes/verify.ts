@@ -45,7 +45,7 @@ async function aggregateExplanation(
 // lying-verifier demo on INV-003, Scene 8): a bonded verifier posts a high
 // score that the challenger will later dispute. Scoring is still supplied by
 // the caller, not an LLM.
-verifyRouter.post("/manual", (req, res) => {
+verifyRouter.post("/manual", async (req, res) => {
   try {
     const { asset_id, score, agent_id = "aggregator-agent-1" } = req.body ?? {};
     if (asset_id === undefined || score === undefined)
@@ -54,7 +54,7 @@ verifyRouter.post("/manual", (req, res) => {
     const explanation = `Verifier posted score ${score}.`;
     const explanation_hash = canonicalizeAndHash({ explanation });
     setExplanation(asset_id, explanation);
-    const tx = casper.submitScore({ asset_id, score: Number(score), agent_id, evidence_hash, explanation_hash });
+    const tx = await casper.submitScore({ asset_id, score: Number(score), agent_id, evidence_hash, explanation_hash });
     setLastScoreId(asset_id, tx.score_id);
     res.json({ asset_id, score: Number(score), score_id: tx.score_id, tx_hash: tx.deploy_hash });
   } catch (e) {
@@ -126,7 +126,7 @@ verifyRouter.post("/", async (req, res) => {
     const explanation_hash = canonicalizeAndHash({ explanation });
     setExplanation(asset_id, explanation);
 
-    const tx = casper.submitScore({
+    const tx = await casper.submitScore({
       asset_id,
       score: final_score,
       agent_id,

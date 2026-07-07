@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   getDashboard, getAssets, getAgents, getTransactions, getChainInfo,
@@ -22,6 +22,35 @@ export default function ControlRoom() {
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
+  const pathD = useMemo(() => {
+    const points = txs
+      .filter((t) => t.action === "submit_score" || t.action === "freeze_asset" || t.action === "resolve_challenge")
+      .map((t) => {
+        if (t.action === "submit_score") {
+          const match = t.result.match(/Score\s+(\d+)/i);
+          return match ? parseInt(match[1], 10) : 0;
+        }
+        if (t.action === "freeze_asset" || t.result.toLowerCase().includes("slashed")) {
+          return 0;
+        }
+        return null;
+      })
+      .filter((val) => val !== null) as number[];
+
+    const scores = points.length > 0 ? points : [0];
+    if (scores.length === 1) {
+      const y = 180 - (scores[0] / 100) * 160;
+      return `M0,${y.toFixed(1)} L1000,${y.toFixed(1)}`;
+    }
+    return scores
+      .map((score, i) => {
+        const x = (i / (scores.length - 1)) * 1000;
+        const y = 180 - (score / 100) * 160;
+        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(" ");
+  }, [txs]);
+
   const refresh = useCallback(async () => {
     const [a, g, t, c, s] = await Promise.all([
       getAssets(), getAgents(), getTransactions(), getChainInfo(), asset ? getDashboard(asset) : null,
@@ -39,8 +68,18 @@ export default function ControlRoom() {
   const note = (m: string) => setLog((l) => [m, ...l].slice(0, 10));
   async function run(label: string, fn: () => Promise<void>) {
     setBusy(true);
-    try { await fn(); } catch (e) { note(`✗ ${label}: ${(e as Error).message}`); }
-    finally { await refresh(); setBusy(false); }
+    try {
+      await fn();
+    } catch (e) {
+      note(`✗ ${label}: ${(e as Error).message}`);
+    } finally {
+      try {
+        await refresh();
+      } catch (err) {
+        console.error("refresh failed", err);
+      }
+      setBusy(false);
+    }
   }
   const ensureAgents = async () => {
     for (const [id, role] of [["aggregator-agent-1", "Aggregator"], ["challenger-agent-1", "Challenger"]] as const) {
@@ -141,8 +180,8 @@ export default function ControlRoom() {
           </div>
           <div className="flex-grow w-full relative mt-sm">
             <svg className="w-full h-full absolute inset-0" preserveAspectRatio="none" viewBox="0 0 1000 200">
-              <path d="M0,150 L100,140 L200,160 L300,120 L400,130 L500,90 L600,110 L700,50 L800,80 L900,40 L1000,30" fill="none" stroke="#1b1c16" strokeWidth="8" />
-              <path className="pulse-path" d="M0,150 L100,140 L200,160 L300,120 L400,130 L500,90 L600,110 L700,50 L800,80 L900,40 L1000,30" fill="none" stroke="#6C698D" strokeWidth="4" />
+              <path d={pathD} fill="none" stroke="#1b1c16" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+              <path className="pulse-path" d={pathD} fill="none" stroke="#6C698D" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
           <div className="text-label-md text-on-surface-variant uppercase mt-sm">{txs.length} on-chain actions recorded</div>
@@ -156,10 +195,10 @@ export default function ControlRoom() {
         <StatCard label="Slashed Verifiers" value={String(slashed)} sub={`${agents.length} agents registered`} highlight={slashed > 0} />
       </div>
 
-      {/* Demo console */}
+      {/* Console */}
       <div className="border-[4px] border-on-surface bg-surface-container-high neobrutalist-shadow p-md flex flex-col gap-md">
         <div className="flex justify-between items-center border-b-[3px] border-on-surface pb-sm">
-          <h2 className="text-headline-md font-black uppercase">Demo Console</h2>
+          <h2 className="text-headline-md font-black uppercase">Console</h2>
           {assets.length > 0 ? (
             <select value={asset} onChange={(e) => setAsset(e.target.value)} className="border-[3px] border-on-surface bg-surface px-sm py-xs text-label-md uppercase font-mono-plex">
               {assets.map((a) => <option key={a.asset_id} value={a.asset_id}>{a.asset_id}</option>)}
@@ -207,7 +246,7 @@ export default function ControlRoom() {
               <span className="font-mono-plex text-label-md text-primary">{t.deploy_hash.slice(0, 14)}…</span>
             </a>
           ))}
-          {txs.length === 0 && <div className="text-on-surface-variant">No transactions yet — run the demo console.</div>}
+          {txs.length === 0 && <div className="text-on-surface-variant">No transactions yet — run the console.</div>}
         </div>
       </div>
     </div>

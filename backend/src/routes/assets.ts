@@ -5,7 +5,7 @@ import { canonicalizeAndHash } from "../services/evidenceHasher.ts";
 export const assetsRouter = Router();
 
 // POST /api/assets — hash invoice data, create the asset on Casper.
-assetsRouter.post("/", (req, res) => {
+assetsRouter.post("/", async (req, res) => {
   try {
     let { asset_id, issuer, debtor, faceValue, dueDate } = req.body ?? {};
     
@@ -34,7 +34,7 @@ assetsRouter.post("/", (req, res) => {
     }
 
     const evidence_hash = canonicalizeAndHash({ asset_id, issuer, debtor, face_value, due_date });
-    const tx = casper.createAsset({
+    const tx = await casper.createAsset({
       asset_id,
       issuer,
       debtor,
