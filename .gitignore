@@ -1,0 +1,33 @@
+# Secrets — never commit (Section 5.2)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secret_key*
+*_secret_key*
+**/keys/
+
+# Node / bun
+node_modules/
+bun.lockb
+dist/
+.next/
+out/
+
+# Rust / Odra
+target/
+contracts/**/wasm/
+*.wasm
+
+# Chain runner local state / secrets
+scripts/chain.env
+scripts/.chain_state
+keys/
+
+# Misc
+.DS_Store
+*.log
+
+final_build_prompt.md
+keys.tar.gz

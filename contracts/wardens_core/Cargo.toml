@@ -1,0 +1,46 @@
+[package]
+edition = "2021"
+name = "wardens_core"
+version = "0.1.0"
+
+[dependencies]
+odra = { version = "2.8.2", features = [], default-features = false }
+# Livenet (real Casper Testnet) executor deps — only compiled with `--features livenet`.
+odra-casper-livenet-env = { version = "2.8.2", optional = true }
+
+[features]
+# Enables the `wardens_livenet` binary that deploys and drives WardensCore on a
+# real Casper node. Kept off by default so `cargo odra test`/`build` are unaffected.
+livenet = ["odra-casper-livenet-env"]
+
+[dev-dependencies]
+odra-test = { version = "2.8.2", features = [], default-features = false }
+
+[build-dependencies]
+odra-build = { version = "2.8.2", features = [], default-features = false }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+odra-build = { version = "2.8.2", features = [], default-features = false }
+
+[[bin]]
+name = "wardens_core_build_contract"
+path = "bin/build_contract.rs"
+test = false
+
+[[bin]]
+name = "wardens_core_build_schema"
+path = "bin/build_schema.rs"
+test = false
+
+[[bin]]
+name = "wardens_livenet"
+path = "bin/livenet.rs"
+required-features = ["livenet"]
+test = false
+
+[profile.release]
+codegen-units = 1
+lto = true
+
+[profile.dev.package."*"]
+opt-level = 3

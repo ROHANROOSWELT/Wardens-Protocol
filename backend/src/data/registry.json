@@ -1,0 +1,5 @@
+[
+  { "company": "ABC Traders", "valid": true, "risk_flag": false },
+  { "company": "RetailMart Ltd", "valid": true, "risk_flag": false },
+  { "company": "Fake Supplier", "valid": false, "risk_flag": true }
+]
