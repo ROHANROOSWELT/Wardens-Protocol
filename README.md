@@ -23,6 +23,7 @@
 
 <p align="center">
   <a href="https://github.com/ROHANROOSWELT/Wardens-Protocol/blob/main/PROOF.md">📜 Testnet Proof</a> •
+  <a href="PLAYBOOK.md">📖 DoraHacks Playbook</a> •
   <a href="https://www.youtube.com/watch?v=XzGEAL43tB4">🎥 Demo Video</a> •
   <a href="https://testnet.cspr.live/transaction/89ee2b761ad1a82fbaa70558e4eb6e03dba5ae3e51aba5acade8456380a41082">🔗 Deploy Tx</a> •
   <a href="https://testnet.cspr.live/contract-package/ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de">🔗 Casper Explorer</a>
@@ -330,6 +331,22 @@ This includes:
 ## 👁️ Vision
 
 > Wardens Protocol turns trust from a one-time assumption into a continuously verified economic market. Autonomous agents compete to earn trust, challengers protect the network from fraud, and Casper enforces accountability through transparent, on-chain incentives. Every loan reflects the current state of reality—not yesterday's audit.
+
+---
+
+## 👥 GitHub Community Standards & Security
+
+This repository is compliant with the GitHub Community Standards:
+* **DoraHacks Playbook:** Comprehensive step-by-step instructions in [PLAYBOOK.md](PLAYBOOK.md).
+* **Code of Conduct:** Refer to [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for behavior guidelines.
+* **Contributing Guide:** Refer to [CONTRIBUTING.md](CONTRIBUTING.md) for how to build and test.
+* **Security Policy:** Refer to [SECURITY.md](SECURITY.md) to report vulnerabilities.
+* **Security Scanning & Dependabot:** Continuous CodeQL analysis and automated package security checks are configured via `.github/workflows/codeql-analysis.yml` and `.github/dependabot.yml`.
+* **CI Suite:** Automatic builds and tests for contracts and services are executed on every commit via `.github/workflows/ci.yml`.
+
+### Repository Metadata & Topics
+Under the GitHub repository settings, the following tags should be enabled:
+`casper-blockchain`, `casper-network`, `buildathon`, `defi`, `rwa`, `multi-agent-system`
 
 ---
 
