@@ -114,3 +114,32 @@ below is a real transaction — verify on the explorer:
 > Status: Phase-1 loop proven end-to-end on Casper Testnet — 16 real transactions.
 > The wasm is built strict-MVP (Casper rejects bulk-memory ops); see
 > `scripts/build_wasm_mvp.sh` and `CHAIN_RUNBOOK.md`.
+
+---
+
+## 3. Phase 2 (Final Round) Architecture Validation
+
+Phase 2 modularization has been completed and verified via 23 comprehensive tests in `contracts/wardens_phase2`.
+
+### Contract Splitting & New Modules
+- **AssetNoteRegistry, TrustScoreRegistry, BondVault, ChallengeCourt, LendingVault**: WardensCore split into 5 independent robust modules.
+- **CovenantEngine**: Implemented state machine (FullAccess, Monitored, DrawsFrozen, BreachMode) translating trust scores into tranche rules.
+- **ReserveVault**: Tranche release gating integrated with CovenantEngine.
+- **PrivacyCommitmentStore**: Commit/reveal hashing scheme for Verifier privacy.
+
+### Agent & Application Capabilities
+- **Insurance Agent**: Underwriting logic driven deterministically based on trust score, covenant state, LTV, and registry flags.
+- **Marketplace**: External verifier registration, dynamic x402 pricing based on reputation.
+- **Phase 2 Dashboard**: Real-time visualization of multi-agent arbitration voting, ReserveVault tranches, and Privacy commitments.
+
+### Phase 2 Deployed Contracts (Casper Testnet)
+These 8 smart contracts have been compiled for Casper MVP compatibility (no bulk-memory operations) and deployed successfully. They represent the 100% on-chain, zero-mocked execution engine for Phase 2:
+
+- **AssetNoteRegistry**: `contract-package-8c6e8f1c799d4abc596973d612492e5b5b03643247d0af27a0db363f7e360320`
+- **TrustScoreRegistry**: `contract-package-3afb414e8f2f2e2c1db569945dc34fa6705bb5efa3c945c7d37856bff7682590`
+- **BondVault**: `contract-package-249f599014a2167dab598362451b4c7b591884b7a9e5f3e65f4f31a5e4783f38`
+- **ChallengeCourt**: `contract-package-83afda159a1e580ccf4baf2144a06a9f753df0db46b5b019e1fe061098f43f27`
+- **LendingVault**: `contract-package-9b83b046e8749359f1cf096420ff5b029cec12777173ab891aa64d00a736bb09`
+- **CovenantEngine**: `contract-package-8b3f4001f64a30028bccb919cf9f235bc2b3ff2fc642683d6c799b5d2fbab50e`
+- **ReserveVault**: `contract-package-c64d65803aa4975709d88f8a039d0b082cb7fed8d000b551a09806424ab08c2f`
+- **PrivacyCommitmentStore**: `contract-package-ac2adf6c0770d2ca1ac44bf197469ee23735587c28507f4eb6ce98743ebb9497`

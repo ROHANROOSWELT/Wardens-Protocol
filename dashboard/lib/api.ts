@@ -53,6 +53,8 @@ export const getChainInfo = () =>
     contract_url: "",
   });
 export const syncChain = (assetId: string) => post(`/api/chain/sync/${assetId}`, {});
+/** Sync all known demo assets + agents from chain in one shot (Sync All button). */
+export const syncAllChain = () => post("/api/chain/sync", {});
 
 // Shared derived helpers (mirror the on-chain rules for display).
 export function ltvForScore(score: number): number {

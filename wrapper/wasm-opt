@@ -1,0 +1,8 @@
+#!/bin/bash
+args=()
+for arg in "$@"; do
+  if [[ "$arg" != "--llvm-memory-copy-fill-lowering" ]]; then
+    args+=("$arg")
+  fi
+done
+exec "/home/rohan/Desktop/final_hope3/wardens/binaryen-version_118/bin/wasm-opt" "${args[@]}"

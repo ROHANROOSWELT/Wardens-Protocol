@@ -11,6 +11,7 @@ echo "Starting verifier agents (4101 parser, 4102 fraud, 4103 registry)…"
 ( cd "$ROOT/agents/parser-agent"   && PORT=4101 bun run src/index.ts ) &
 ( cd "$ROOT/agents/fraud-agent"    && PORT=4102 bun run src/index.ts ) &
 ( cd "$ROOT/agents/registry-agent" && PORT=4103 bun run src/index.ts ) &
+( cd "$ROOT/agents/insurance-agent" && PORT=4104 bun run src/index.ts ) &
 sleep 1
 
 echo "Starting backend orchestrator on :4000 …"

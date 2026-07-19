@@ -291,26 +291,29 @@ Open `http://localhost:3000` to interact with the live dashboard.
 ## 📂 Repository Layout
 
 ```
-contracts/wardens_core/   Unified WardensCore Odra contract + 12 passing tests
-backend/                  Express orchestrator (assets/agents/verify/challenge/vault)
-agents/                   parser · fraud · registry (x402 verifiers) · aggregator · challenger
-dashboard/                One-page Next.js dashboard
-scripts/                  start_all · seed_demo · run_verification · run_challenge · deploy
+contracts/wardens_core/   Phase 1: Unified WardensCore Odra contract + 12 passing tests
+contracts/wardens_phase2/ Phase 2: Modularized contracts (AssetNoteRegistry, CovenantEngine, etc.) + 23 passing tests
+backend/                  Express orchestrator (assets/agents/verify/challenge/vault, phase 1 & 2 routes)
+agents/                   parser · fraud · registry (x402) · aggregator · challenger · insurance-agent
+dashboard/                One-page Next.js dashboard (Includes Phase 1 MVP and Phase 2 Architecture)
+scripts/                  start_all · seed_demo · run_verification · run_challenge · deploy · deploy_phase2
 docs/                     [demo-script](docs/demo-script.md) · [contract-api](docs/contract-api.md) · [agent-api](docs/agent-api.md) · [roadmap](docs/roadmap.md)
-PROOF.md                  Deploy + transaction hashes
+PROOF.md                  Deploy + transaction hashes + Phase 2 verification
 accounts.md               Testnet wallet public keys
 ```
 
 ---
 
-## 🗺️ Roadmap
+## 🗺️ Phase 2 Implementation (Final Round)
 
-The long-term development strategy and target specifications are fully documented in [docs/roadmap.md](docs/roadmap.md). 
+The long-term development strategy originally documented as the roadmap in [docs/roadmap.md](docs/roadmap.md) has been **fully implemented** and integrated into the `wardens_phase2` architecture. 
 
 This includes:
-*   Modular smart contract split (`AssetRegistry`, `TrustScoreRegistry`, `ChallengeCourt`, etc.).
-*   Integration of a `CovenantEngine` for tranche release rules.
-*   Merklized `PrivacyCommitmentStore` for zero-disclosure evidence checking.
+*   **Modular smart contract split** (`AssetNoteRegistry`, `TrustScoreRegistry`, `BondVault`, `ChallengeCourt`, `LendingVault`).
+*   **Integration of a `CovenantEngine`** for programmatic tranche release rules tied to Trust Scores.
+*   **Integration of a `ReserveVault`** to manage restricted capital tranches.
+*   **Merklized `PrivacyCommitmentStore`** for zero-disclosure evidence checking.
+*   **Insurance Underwriting Agent** running autonomously on port `4104` evaluating dynamic LTV risk.
 
 ---
 

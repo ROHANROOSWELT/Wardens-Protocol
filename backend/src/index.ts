@@ -6,12 +6,13 @@ import express from "express";
 import cors from "cors";
 import { casper } from "./services/casperClient.ts";
 import { getExplanation, receiptsForAsset, getLastScoreId } from "./services/store.ts";
-import { syncAssetFromChain, contractAddress } from "./services/chainSync.ts";
+import { syncAssetFromChain, syncAllFromChain, contractAddress } from "./services/chainSync.ts";
 import { assetsRouter } from "./routes/assets.ts";
 import { agentsRouter } from "./routes/agents.ts";
 import { verifyRouter } from "./routes/verify.ts";
 import { challengeRouter } from "./routes/challenge.ts";
 import { vaultRouter } from "./routes/vault.ts";
+import { phase2Router } from "./routes/phase2.ts";
 
 const app = express();
 app.use(cors());
@@ -29,10 +30,20 @@ app.use("/api/agents", agentsRouter);
 app.use("/api/verify", verifyRouter);
 app.use("/api/challenge", challengeRouter);
 app.use("/api/vault", vaultRouter);
+// Phase 2 — CovenantEngine, ReserveVault, PrivacyStore, Marketplace, Insurance, Arbitration
+app.use("/api/p2", phase2Router);
 
 // GET /api/dashboard/:asset_id — full state for the one-page dashboard.
-app.get("/api/dashboard/:asset_id", (req, res) => {
+// In chain mode: syncs this asset from the real contract first so every field
+// reflects the actual on-chain value at the time of the request.
+app.get("/api/dashboard/:asset_id", async (req, res) => {
   const asset_id = req.params.asset_id;
+
+  if ((process.env.WARDENS_MODE ?? "sim") === "chain") {
+    // Best-effort live sync — don't fail the request if the node is slow.
+    await syncAssetFromChain(asset_id).catch(() => {});
+  }
+
   const asset = casper.assets.get(asset_id);
   if (!asset) return res.status(404).json({ error: "AssetNotFound" });
   const position = casper.positions.get(asset_id) ?? null;
@@ -74,15 +85,34 @@ app.get("/api/chain/info", (_req, res) => {
 });
 
 // Pull LIVE on-chain state for one asset into the read-model (chain mode only).
-// Costs a little gas and takes ~seconds per field — an explicit, on-demand action.
 app.post("/api/chain/sync/:asset_id", async (req, res) => {
   if ((process.env.WARDENS_MODE ?? "sim") !== "chain") {
-    return res.status(400).json({ error: "backend is not in chain mode (start it with WARDENS_MODE=chain)" });
+    return res.status(400).json({ error: "backend is not in chain mode" });
   }
   const result = await syncAssetFromChain(req.params.asset_id);
   if (!result.ok) return res.status(502).json(result);
   res.json({ ok: true, asset_id: req.params.asset_id });
 });
 
+// Pull ALL known demo assets + agents from chain in one shot (Sync button).
+app.post("/api/chain/sync", async (_req, res) => {
+  if ((process.env.WARDENS_MODE ?? "sim") !== "chain") {
+    return res.status(400).json({ error: "backend is not in chain mode" });
+  }
+  await syncAllFromChain();
+  res.json({ ok: true, assets: casper.assets.size, agents: casper.agents.size });
+});
+
 const PORT = Number(process.env.PORT ?? 4000);
-app.listen(PORT, () => console.log(`[wardens-backend] listening on :${PORT} (mode=${process.env.WARDENS_MODE ?? "sim"})`));
+const MODE = process.env.WARDENS_MODE ?? "sim";
+
+app.listen(PORT, () => {
+  console.log(`[wardens-backend] listening on :${PORT} (mode=${MODE})`);
+  if (MODE === "chain") {
+    // Pull live on-chain state immediately so the dashboard shows real values
+    // from the first request — not empty in-memory placeholders.
+    syncAllFromChain().catch((e) =>
+      console.error("[wardens-backend] startup chain sync failed:", (e as Error).message)
+    );
+  }
+});

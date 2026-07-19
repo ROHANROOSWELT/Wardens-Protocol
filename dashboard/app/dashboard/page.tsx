@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   getDashboard, getAssets, getAgents, getTransactions, getChainInfo,
-  post, syncChain, explorerLink, ltvForScore,
+  post, syncChain, syncAllChain, explorerLink, ltvForScore,
 } from "../../lib/api";
 
 
@@ -120,7 +120,13 @@ export default function ControlRoom() {
     const r = await post("/api/challenge/resolve", { challenge_id: open.challenge_id, upheld: true });
     note(r.ok ? `✓ challenge #${open.challenge_id} upheld — verifier slashed` : `✗ ${r.data.error}`);
   });
-  const sync = () => { setSyncing(true); syncChain(asset).then((r) => note(r.ok ? `⛓ synced ${asset} from testnet` : `✗ ${r.data.error}`)).finally(() => { refresh(); setSyncing(false); }); };
+  const sync = () => {
+    setSyncing(true);
+    // Sync all 3 demo assets + both agents from chain in one shot.
+    syncAllChain()
+      .then((r) => note(r.ok ? `⧓ synced all assets from Casper Testnet` : `✗ ${r.data?.error ?? "sync failed"}`))
+      .finally(() => { refresh(); setSyncing(false); });
+  };
 
   // System trust score = average of tracked assets' current scores.
   const scored = assets.filter((a) => a.current_score > 0);
@@ -146,7 +152,7 @@ export default function ControlRoom() {
           )}
           {isChain && (
             <button onClick={sync} disabled={syncing} className="border-[3px] border-on-surface bg-surface-container-highest text-label-md uppercase tracking-widest px-sm py-xs neobrutalist-btn flex items-center gap-xs">
-              <span className="material-symbols-outlined">sync</span>{syncing ? "Syncing…" : "Sync"}
+              <span className="material-symbols-outlined">sync</span>{syncing ? "Syncing…" : "Sync All"}
             </button>
           )}
         </div>

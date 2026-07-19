@@ -1,0 +1,23 @@
+[[contracts]]
+fqn = "wardens_phase2::asset_note_registry::AssetNoteRegistry"
+
+[[contracts]]
+fqn = "wardens_phase2::trust_score_registry::TrustScoreRegistry"
+
+[[contracts]]
+fqn = "wardens_phase2::bond_vault::BondVault"
+
+[[contracts]]
+fqn = "wardens_phase2::challenge_court::ChallengeCourt"
+
+[[contracts]]
+fqn = "wardens_phase2::lending_vault::LendingVault"
+
+[[contracts]]
+fqn = "wardens_phase2::covenant_engine::CovenantEngine"
+
+[[contracts]]
+fqn = "wardens_phase2::reserve_vault::ReserveVault"
+
+[[contracts]]
+fqn = "wardens_phase2::privacy_commitment_store::PrivacyCommitmentStore"

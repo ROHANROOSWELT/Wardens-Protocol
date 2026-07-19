@@ -7,13 +7,7 @@ export const vaultRouter = Router();
 vaultRouter.post("/deposit", async (req, res) => {
   try {
     const { asset_id, collateral_value } = req.body ?? {};
-
-    // Optimisation: skip on-chain tx if already deposited
-    const pos = casper.positions.get(asset_id);
-    if (pos && pos.collateral_value >= Number(collateral_value ?? 0)) {
-      return res.json({ deploy_hash: "", asset_id, message: "Collateral already deposited" });
-    }
-
+    if (!asset_id) return res.status(400).json({ error: "asset_id required" });
     const tx = await casper.depositCollateral(asset_id, Number(collateral_value ?? 0));
     res.json({ deploy_hash: tx.deploy_hash, asset_id });
   } catch (e) {
@@ -25,13 +19,7 @@ vaultRouter.post("/deposit", async (req, res) => {
 vaultRouter.post("/borrow", async (req, res) => {
   try {
     const { asset_id, amount } = req.body ?? {};
-
-    // Optimisation: skip on-chain tx if already borrowed
-    const pos = casper.positions.get(asset_id);
-    if (pos && pos.borrowed_amount >= Number(amount ?? 0)) {
-      return res.json({ deploy_hash: "", asset_id, amount: pos.borrowed_amount, message: "Amount already borrowed" });
-    }
-
+    if (!asset_id) return res.status(400).json({ error: "asset_id required" });
     const tx = await casper.borrow(asset_id, Number(amount ?? 0));
     res.json({ deploy_hash: tx.deploy_hash, asset_id, amount: Number(amount ?? 0) });
   } catch (e) {
