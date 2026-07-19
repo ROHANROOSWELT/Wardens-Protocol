@@ -75,9 +75,9 @@ These capabilities make Casper the trust layer that continuously secures RWA col
 | 💸 **x402 Payments** | HTTP-native micropayment verification fees |
 | 🏦 **Dynamic Lending Vault** | Dynamic LTV adjustments responding to collateral health |
 | ⚡ **Casper Testnet Deployment** | Live execution and transaction trail |
-| ✅ **12 Smart Contract Tests** | Comprehensive contract unit test coverage |
+| ✅ **35 Smart Contract Tests** | Comprehensive test coverage across Phase 1 & 2 |
 | 📜 **Verified Transactions** | End-to-end chain proof logged |
-| 🖥 **Interactive Dashboard** | Real-time neobrutalist monitoring console |
+| 🖥 **Interactive Dashboard** | Real-time Protocol V2 monitoring console |
 
 ---
 
@@ -206,13 +206,13 @@ graph TD
 
 | Component | Technical Implementation | Details |
 | :--- | :--- | :--- |
-| **Smart Contracts (1x)** | `Odra Rust WASM` | Unified `WardensCore` contract (compiles to target WASM with access controls). Implements `create_asset`, `register_agent`, `post_bond`, `submit_score`, `open_challenge`, and `resolve_challenge` entry points. **12/12 passing unit tests**. |
-| **Verifier Agents (3x)** | `Express/Bun HTTP Daemons` | Parser, Fraud-Heuristic, and Registry agents performing deterministic evaluation metrics (issuer valid, duplicate invoice detection, and payment check). |
+| **Smart Contracts (8x)** | `Odra Rust WASM` | Protocol V2 Modular Architecture (AssetNoteRegistry, ReserveVault, CovenantEngine, etc.). **35/35 passing unit tests**. |
+| **Verifier Agents (4x)** | `Express/Bun HTTP Daemons` | Parser, Fraud-Heuristic, Registry, and Insurance agents performing deterministic evaluation metrics. |
 | **x402 Micropayments** | `HTTP 402 + X-Payment Handshake` | Client-side and server-side payment checking. Handles HTTP 402 retry headers and verifies on-chain transaction hashes to generate cryptographic receipt logs. |
 | **Dispute & Slashing** | `Adversarial Challenger Agent` | Autonomous background monitoring service. Cross-checks on-chain trust scores against raw invoice ledgers, submits disputes, and slashes bonds on-chain. |
 | **DeFi Lending Vault** | `Dynamic LTV Scale Machine` | On-chain vault responding to score updates: Score >= 80 maps to 75% LTV; Score < 50 triggers frozen state (0% LTV). |
 | **Testnet Deployment** | `secp256k1 Signed transactions` | Verified, real-time transaction trail confirmed and finalized on Casper Testnet using ECDSA/SHA256 signing. |
-| **Dashboard UI** | `Next.js, TypeScript, & Tailwind` | Real-time state polling via JSON-RPC, rendering score updates, LTV, active verifier bonds, payment receipts, and explorer logs. |
+| **Dashboard UI** | `Next.js, TypeScript, & Tailwind` | Real-time state polling via JSON-RPC, rendering score updates, LTV, active verifier bonds, payment receipts, explorer logs, and Protocol V2 architecture. |
 
 ---
 
@@ -222,8 +222,8 @@ The protocol contracts and demo operations are deployed and active on the Casper
 (`casper-test`, Casper 2.0). Every hash is a real transaction — verify at
 `https://testnet.cspr.live/transaction/<hash>`. Full list in [PROOF.md](PROOF.md).
 
-*   **Contract Package Hash**: `contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de`
-*   **Deploy WardensCore**: `89ee2b761ad1a82fbaa70558e4eb6e03dba5ae3e51aba5acade8456380a41082`
+*   **Phase 1 Core Hash**: `contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de`
+*   **Protocol V2 (Phase 2)**: 8 Modular Contracts successfully deployed (See PROOF.md for all 8 live hashes)
 
 ### Transaction Log
 
@@ -292,10 +292,10 @@ Open `http://localhost:3000` to interact with the live dashboard.
 
 ```
 contracts/wardens_core/   Phase 1: Unified WardensCore Odra contract + 12 passing tests
-contracts/wardens_phase2/ Phase 2: Modularized contracts (AssetNoteRegistry, CovenantEngine, etc.) + 23 passing tests
+contracts/wardens_phase2/ Protocol V2: Modularized contracts (AssetNoteRegistry, CovenantEngine, etc.) + 23 passing tests
 backend/                  Express orchestrator (assets/agents/verify/challenge/vault, phase 1 & 2 routes)
 agents/                   parser · fraud · registry (x402) · aggregator · challenger · insurance-agent
-dashboard/                One-page Next.js dashboard (Includes Phase 1 MVP and Phase 2 Architecture)
+dashboard/                One-page Next.js dashboard (Includes Phase 1 MVP and Protocol V2 Architecture)
 scripts/                  start_all · seed_demo · run_verification · run_challenge · deploy · deploy_phase2
 docs/                     [demo-script](docs/demo-script.md) · [contract-api](docs/contract-api.md) · [agent-api](docs/agent-api.md) · [roadmap](docs/roadmap.md)
 PROOF.md                  Deploy + transaction hashes + Phase 2 verification
@@ -304,7 +304,7 @@ accounts.md               Testnet wallet public keys
 
 ---
 
-## 🗺️ Phase 2 Implementation (Final Round)
+## 🗺️ Protocol V2 Implementation (Final Round Phase 2)
 
 The long-term development strategy originally documented as the roadmap in [docs/roadmap.md](docs/roadmap.md) has been **fully implemented** and integrated into the `wardens_phase2` architecture. 
 

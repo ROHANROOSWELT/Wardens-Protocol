@@ -117,8 +117,8 @@ export default function Phase2Dashboard() {
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-md">
         <div>
-          <h1 className="text-headline-lg md:text-headline-xl font-black uppercase tracking-tighter">
-            Phase 2 — Final Round
+          <h1 className="text-display-sm font-black uppercase tracking-tighter mb-1">
+            Protocol V2 (Modular Architecture)
           </h1>
           <p className="text-body-lg text-on-surface-variant mt-xs border-l-[4px] border-secondary pl-sm">
             CovenantEngine · ReserveVault · PrivacyCommitmentStore · Marketplace · Insurance

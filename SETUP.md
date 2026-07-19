@@ -27,10 +27,11 @@ cd Wardens-Protocol           # (the project root; called "repo root" below)
 Repo layout:
 
 ```
-contracts/wardens_core/   WardensCore Odra smart contract (+ livenet executor)
+contracts/wardens_core/   Phase 1: WardensCore Odra smart contract (+ livenet executor)
+contracts/wardens_phase2/ Protocol V2: 8 Modular Smart Contracts (AssetNoteRegistry, CovenantEngine, etc.)
 backend/                  Express/Bun orchestrator (REST API)
-agents/                   parser · fraud · registry (x402 verifiers) · aggregator · challenger
-dashboard/                Next.js one-page dashboard
+agents/                   parser · fraud · registry (x402 verifiers) · aggregator · challenger · insurance
+dashboard/                Next.js dashboard (Control Room & Protocol V2 tab)
 scripts/                  demo + chain (testnet) scripts
 ```
 
@@ -62,7 +63,7 @@ server; the dashboard install happens in step 1.6.)
 ```bash
 bash scripts/start_all.sh
 ```
-This starts: parser agent `:4101`, fraud agent `:4102`, registry agent `:4103`, and the
+This starts: parser agent `:4101`, fraud agent `:4102`, registry agent `:4103`, insurance agent `:4104`, and the
 backend orchestrator `:4000`.
 
 **Option B — start each service manually** (one terminal each; this is how you'd run your
@@ -74,7 +75,9 @@ cd agents/parser-agent   && PORT=4101 bun run src/index.ts
 cd agents/fraud-agent    && PORT=4102 bun run src/index.ts
 # terminal 3 — registry verifier
 cd agents/registry-agent && PORT=4103 bun run src/index.ts
-# terminal 4 — backend orchestrator
+# terminal 4 — insurance verifier
+cd agents/insurance-agent && PORT=4104 bun run src/index.ts
+# terminal 5 — backend orchestrator
 cd backend && PORT=4000 WARDENS_MODE=sim bun run src/index.ts
 ```
 
@@ -283,6 +286,12 @@ bash scripts/chain_read_state.sh          # prove final state on-chain
 ```
 Each mutating script prints its transaction hash and a `testnet.cspr.live` link — copy
 those into `PROOF.md`. `CHAIN_RUNBOOK.md` maps each script to its PROOF.md row.
+
+To deploy the massive **Protocol V2 (Phase 2)** architecture (all 8 modular contracts), run:
+```bash
+bash scripts/deploy_phase2.sh
+```
+This automatically updates the hashes in `backend/.env` for the V2 backend orchestrator!
 
 ### 3.5 …or drive the contract manually (livenet executor)
 
