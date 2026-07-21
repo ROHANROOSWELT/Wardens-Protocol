@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>⚡ Live Casper Testnet • 🤖 5 Autonomous Agents • 💸 x402 Micropayments • 🛡️ On-chain Slashing • 🏦 Covenant Engine</b>
+  <b>⚡ Live Casper Testnet • 🤖 6 Autonomous Agents • 💸 x402 Micropayments • 🛡️ On-chain Slashing • 🏦 Covenant Engine</b>
 </p>
 
 <p align="center">
@@ -30,85 +30,98 @@
 **Wardens Protocol is not a mockup.** It is a production-grade, 100% on-chain system built natively on the Casper Network to solve the Real-World Asset (RWA) "stale collateral" problem. 
 
 * **ZERO Mock Data**: The system is hardwired directly to the live Casper Testnet. The Next.js dashboard and backend orchestrator sync seamlessly with the blockchain state in real-time. No local JSON stubs are used.
-* **Deterministic Agent Intelligence**: The 5 autonomous verifier agents execute strict, deterministic, mathematical cross-validation on actual JSON invoice documents and blockchain ledgers. 
+* **Deterministic Agent Intelligence**: The autonomous verifier agents execute strict, deterministic, mathematical cross-validation on actual uploaded JSON invoice documents and on-chain ledgers. 
 * **x402 Micropayments**: We integrated a native machine-to-machine payment handshake where agents demand Casper tokens via HTTP 402 headers before executing validation logic.
-* **Modular "Covenant Engine" Architecture**: Smart contracts have been modularized into a Covenant Engine, Reserve Vault, and Multi-Agent Arbitration court for maximum enterprise scalability.
+* **Modular "Covenant Engine" Architecture**: Smart contracts have been deeply modularized into a Covenant Engine, Reserve Vault, and Multi-Agent Arbitration court for maximum enterprise scalability.
 
 ---
 
-## 📖 Introduction
+## 📖 Comprehensive Introduction
 
 Wardens Protocol implements a self-policing, adversarial multi-agent trust market to secure Real-World Asset (RWA) collateral on the Casper Network. 
 
-In traditional DeFi, tokenized RWA assets (like invoices or real estate) suffer from a **"stale collateral"** problem: they are audited once at tokenization but trust is assumed indefinitely even if the off-chain status changes. Wardens Protocol demonstrates how Verifier Agents can continuously audit collateral off-chain, paid per-request via native **x402 Micropayments**. If a background Challenger Agent proves a verification is fraudulent, the verifier's bond is slashed on-chain, and the Lending Vault immediately updates its LTV to 0% to protect pool depositors.
+In traditional DeFi, tokenized RWA assets (like invoices or real estate) suffer from a **"stale collateral"** problem: they are audited once at tokenization, but their trust is assumed indefinitely even if their off-chain status deteriorates. Wardens Protocol demonstrates how a decentralized network of Verifier Agents can continuously audit collateral off-chain, paid per-request via native **x402 Micropayments**. 
+
+If a background Challenger Agent proves a verification is fraudulent, the verifier's bond is slashed on-chain, and the Lending Vault immediately updates its Loan-to-Value (LTV) limits to 0% to protect pool depositors. Instead of assuming trust, the protocol continuously forces agents to *earn* it.
 
 ---
 
-## 📈 Repository Statistics
+## 🤖 The Autonomous Agent Network (Deep Dive)
 
-| Feature | Detail |
-| :--- | :--- |
-| 🛡 **5 Autonomous Agents** | Parser, Fraud, Registry, Aggregator, Challenger |
-| ⚖ **On-chain Challenge Court** | Live dispute resolution and bond slashing |
-| 💸 **x402 Payments** | HTTP-native micropayment verification fees |
-| 🏦 **Covenant Engine & Reserve Vault** | Dynamic LTV scaling and tranche release conditions |
-| ⚡ **100% Casper Testnet Integration** | Flawless, non-mocked execution directly on the blockchain |
-| ✅ **35 Smart Contract Tests** | Comprehensive test coverage via Odra framework |
-| 📜 **Verified Transactions** | End-to-end chain proof logged securely |
+The protocol relies on a microservice architecture of independent agents, each specializing in a specific vector of RWA validation.
 
----
-
-## ⚡ 30-Second Demo Flow
-
-```
-1. Create Invoice Collateral (Upload JSON Document)
-       ↓
-2. Orchestrator Pays Verifiers via x402 Micropayments
-       ↓
-3. Agents Parse JSON & Fetch Live Chain State
-       ↓
-4. Aggregator Posts Deterministic Trust Score to Casper
-       ↓
-5. Covenant Engine Calculates Dynamic Loan-to-Value (LTV)
-       ↓
-6. Challenger Agent Catches Lying Verifier (Dispute Opened)
-       ↓
-7. Verifier Slashed On-Chain & Collateral Frozen (LTV 0%)
-```
+1. **Parser Agent (`:4101`)**: 
+   * **Role:** Structural analysis. 
+   * **Logic:** Downloads the raw, off-chain JSON invoice document, parses the data, and ensures the claimed `amount` and `due_date` inside the document perfectly match the cryptographic metadata committed to the Casper blockchain.
+2. **Fraud Agent (`:4102`)**: 
+   * **Role:** Anomaly detection. 
+   * **Logic:** Scans the live Casper blockchain state for duplicate invoice hashes or suspiciously identical face values across different issuers, penalizing assets that appear to be double-financed.
+3. **Registry Agent (`:4103`)**: 
+   * **Role:** Counterparty verification. 
+   * **Logic:** Performs algorithmic heuristic checks on the issuer and debtor strings (e.g., checking for restricted corporate entities, length anomalies, and formatting).
+4. **Aggregator Agent**: 
+   * **Role:** Consensus engine.
+   * **Logic:** Collects the individual scores from the Parser, Fraud, and Registry agents, calculates the weighted median score, drops extreme outliers, and submits the finalized Trust Score to the Casper smart contract.
+5. **Challenger Agent (The Auditor)**: 
+   * **Role:** Adversarial policing.
+   * **Logic:** Runs an autonomous background loop pulling live state from Casper. If it detects a Trust Score that is suspiciously high for a flagged asset, it pays a "Counter Bond" to the smart contract and opens an official dispute in the Challenge Court to slash the verifier.
+6. **Insurance Agent (`:4104`)**: 
+   * **Role:** Risk Underwriting (Phase 2).
+   * **Logic:** Evaluates the on-chain LTV and Covenant State to calculate an automated insurance premium baseline for the asset pool.
 
 ---
 
-## 💡 Key Innovations
+## 🧠 Determinism vs. LLM Integration
 
-*   **Continuous RWA Verification**: Continuous health checks replace static one-time audits.
-*   **Autonomous Verifier Economy**: Off-chain agents perform specialized algorithmic validations.
-*   **Economic Trust Incentives**: Staking is strictly aligned with verifier performance.
-*   **Native x402 Micropayments**: The cutting-edge protocol for monetizing API agents.
-*   **Adversarial Challenge Protocol**: Incentivized challengers constantly monitor and flag dishonesty.
-*   **Trust-Aware Lending**: Direct linking between collateral validation and loan limits in the Reserve Vault.
+A critical vulnerability in agentic financial systems is the non-determinism of Large Language Models (LLMs) executing state changes. Wardens Protocol solves this by strictly isolating LLMs:
+
+* **Strict Determinism for Slashing:** All Trust Scores (0-100) and Valid/Invalid booleans are calculated using strict, mathematical heuristics in TypeScript. This ensures that if a verifier is slashed on-chain, it is based on mathematically provable facts, preventing AI hallucinations from stealing agent bonds.
+* **LLMs for Explainability:** The system queries an LLM (Gemini 2.0 / OpenAI) strictly in a "read-only" post-processing step. The LLM translates the deterministic findings array (e.g., `["Mismatch: document amount 5000 != chain amount 8000"]`) into a human-readable legal summary for the dashboard, but its output is never used to calculate the score.
 
 ---
 
-## 📐 System Architecture
+## 🏛️ Smart Contract Architecture (Phase 1 & Phase 2)
 
-```mermaid
-graph TD
-    classDef comp fill:#111827,stroke:#374151,stroke-width:2px,color:#f3f4f6;
-    classDef contract fill:#064e3b,stroke:#059669,stroke-width:2px,color:#ecfdf5;
+The system is built on Casper using the Odra framework, divided into a Phase 1 MVP and a massively expanded Phase 2 modular architecture.
 
-    Dash[Dashboard Next.js<br/>Control Room · Covenant Engine · Vaults]:::comp
-    Backend[Backend Orchestrator<br/>Express/Bun REST API & Testnet Sync]:::comp
-    Verifiers[Verifier Agents<br/>parser · fraud · registry x402-paid]:::comp
-    Aggregator[Aggregator Agent]:::comp
-    Challenger[Challenger Agent]:::comp
-    WCore[WardensCore Contract Odra<br/>Modular ReserveVault · Court · Slashing]:::contract
+### Phase 1: `WardensCore`
+The original monolithic contract that handles asset registration, basic agent bonding, score submission, and rudimentary LTV freezing.
 
-    Dash -- HTTP JSON --> Backend
-    Backend -- "x402 (402 -> pay -> receipt)" --> Verifiers
-    Backend -- "Odra Rust Entrypoints" --> WCore
-    Aggregator -- Orchestrated by --> Backend
-    Challenger -- "open_challenge / resolve_challenge" --> WCore
-```
+### Phase 2: Protocol V2 (The Covenant Engine Suite)
+To prove enterprise readiness, we shattered the monolith into 8 distinct modular contracts:
+1. **AssetRegistry:** Stores the baseline metadata and status of the tokenized collateral.
+2. **ScoreRegistry:** Stores the immutable ledger of agent-submitted trust scores.
+3. **BondVault:** Escrows the Casper token (CSPR) stakes deposited by verifier agents.
+4. **ChallengeCourt:** Handles multi-agent voting arbitration and on-chain dispute resolutions.
+5. **LendingVault:** A DeFi lending pool that checks LTV limits before authorizing CSPR withdrawals.
+6. **CovenantEngine:** A programmatic rule-engine that assigns compliance states (`FullAccess`, `Monitored`, `DrawsFrozen`) based on score thresholds.
+7. **ReserveVault:** Manages locked capital tranches, allowing release *only* if the CovenantEngine permits it.
+8. **PrivacyStore:** A Merklized data registry for committing zero-knowledge evidence hashes without revealing the underlying PII data.
+
+---
+
+## 💸 The x402 Micropayment Protocol (Technical Details)
+
+To monetize the agent network, we built a native adaptation of the L402 API payment standard.
+
+1. **The Demand:** When the Orchestrator sends an unauthenticated `POST /verify` to an agent, the agent immediately rejects it with an `HTTP 402 Payment Required` status code, injecting `X-Payment-Amount` and `X-Payment-Address` headers.
+2. **The Handshake:** The Orchestrator detects the 402, processes the micropayment, and retries the request with a cryptographic `X-Payment` proof header.
+3. **The Receipt:** The agent verifies the payment, executes the verification logic, and returns a secure `x402_receipt` hash bound to the payload.
+
+---
+
+## ⚖️ On-Chain Slashing & LTV Mathematics
+
+The dynamic nature of the protocol is enforced entirely by the Casper smart contracts:
+
+**LTV (Loan-to-Value) Scaling Machine:**
+* **Score 80 - 100:** Asset is healthy -> `75% LTV`
+* **Score 50 - 79:** Asset is risky -> `50% LTV`
+* **Score 0 - 49:** Asset is fraudulent -> `0% LTV` (Frozen, all borrows blocked immediately)
+
+**Slashing Economics:**
+* **Challenger Wins:** The dishonest verifier's entire bond is burned/redistributed. The verifier's reputation drops by 50, and their account is deactivated. The challenger receives the verifier's slashed bond + their own counter-bond back.
+* **Verifier Wins:** The challenger loses their counter-bond for raising a frivolous dispute.
 
 ---
 
