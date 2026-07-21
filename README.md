@@ -13,6 +13,7 @@
   <img src="https://img.shields.io/badge/Odra-orange?style=for-the-badge" alt="Odra">
   <img src="https://img.shields.io/badge/Casper%20Network-red?style=for-the-badge" alt="Casper Network">
   <img src="https://img.shields.io/badge/Next.js-black?style=for-the-badge&logo=next.js" alt="Next.js">
+  <img src="https://img.shields.io/badge/Microsoft%20Azure-blue?style=for-the-badge&logo=microsoftazure" alt="Azure">
   <img src="https://img.shields.io/badge/Build-Passing-green?style=for-the-badge" alt="Build Passing">
   <img src="https://img.shields.io/badge/Status-100%25_On--Chain-brightgreen?style=for-the-badge" alt="100% On Chain">
 </p>
@@ -60,6 +61,7 @@
 * **ZERO Mock Data**: The system is hardwired directly to the live Casper Testnet.
 * **Deterministic Agent Intelligence**: Agents execute strict, mathematical cross-validation on actual JSON invoice documents and blockchain ledgers. 
 * **x402 Micropayments**: Native machine-to-machine payment handshake where agents demand Casper tokens via HTTP 402 headers before executing logic.
+* **Production Hybrid Architecture**: The dashboard is globally distributed via Vercel Edge networks, while the stateful Backend Orchestrator and 5 Agents run continuously on a dedicated Microsoft Azure Virtual Machine.
 * **Modular "Covenant Engine"**: Smart contracts have been modularized into a Covenant Engine, Reserve Vault, and Multi-Agent Arbitration court for maximum scalability.
 
 ---
