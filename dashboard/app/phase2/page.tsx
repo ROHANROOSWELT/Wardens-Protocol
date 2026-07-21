@@ -33,20 +33,29 @@ export default function Phase2Dashboard() {
   const [tranches, setTranches] = useState<Tranche[]>([]);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [prices, setPrices] = useState<any[]>([]);
+  const [dynamicAssets, setDynamicAssets] = useState<string[]>([]);
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   const note = (m: string) => setLog((l) => [m, ...l].slice(0, 12));
 
   const refresh = useCallback(async () => {
-    const [c, cov, tr, cm, pr] = await Promise.all([
+    const [c, cov, tr, cm, pr, aList] = await Promise.all([
       getJson<{ mode: string }>("/api/chain/info", { mode: "sim" }),
       getJson(`/api/p2/covenant/${asset}`, null),
       getJson<Tranche[]>(`/api/p2/reserve/tranches/${asset}`, []),
       getJson<Commitment[]>(`/api/p2/privacy/commitments/${asset}`, []),
       getJson<any[]>("/api/p2/marketplace/prices", []),
+      getJson<any[]>("/api/assets", []),
     ]);
     setChain(c); setCovenant(cov); setTranches(tr); setCommitments(cm); setPrices(pr);
+    
+    // update dynamic asset list 
+    const fetchedIds = aList.map((a: any) => a.asset_id);
+    setDynamicAssets(fetchedIds);
+    if (fetchedIds.length > 0 && !fetchedIds.includes(asset)) {
+      setAsset(fetchedIds[0]);
+    }
   }, [asset]);
 
   useEffect(() => { refresh(); const i = setInterval(refresh, 5000); return () => clearInterval(i); }, [refresh]);
@@ -118,7 +127,7 @@ export default function Phase2Dashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-md">
         <div>
           <h1 className="text-display-sm font-black uppercase tracking-tighter mb-1">
-            Protocol V2 (Modular Architecture)
+            Covenant Engine (Modular Architecture)
           </h1>
           <p className="text-body-lg text-on-surface-variant mt-xs border-l-[4px] border-secondary pl-sm">
             CovenantEngine · ReserveVault · PrivacyCommitmentStore · Marketplace · Insurance
@@ -131,20 +140,20 @@ export default function Phase2Dashboard() {
             </span>
           )}
           <Link href="/dashboard" className="border-[3px] border-on-surface bg-surface text-label-md uppercase px-sm py-xs neobrutalist-btn">
-            ← Phase 1
+            ← Control Room
           </Link>
         </div>
       </div>
 
-      {/* Asset selector */}
-      <div className="flex items-center gap-sm">
+      <div className="flex items-center gap-sm flex-wrap">
         <span className="text-label-md uppercase tracking-widest">Asset:</span>
-        {["INV-001", "INV-002-DUPLICATE", "INV-003-LYING-SCORE"].map((id) => (
+        {dynamicAssets.map((id) => (
           <button key={id} onClick={() => setAsset(id)}
             className={`border-[3px] px-sm py-xs text-label-md uppercase tracking-wide neobrutalist-btn ${asset === id ? "border-primary bg-primary-container text-on-primary" : "border-on-surface bg-surface"}`}>
             {id}
           </button>
         ))}
+        {dynamicAssets.length === 0 && <span className="text-body-sm text-on-surface-variant">No assets found</span>}
       </div>
 
       {/* Covenant Engine */}

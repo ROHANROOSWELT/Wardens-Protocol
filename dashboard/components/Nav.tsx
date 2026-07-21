@@ -8,7 +8,7 @@ const LINKS = [
   { href: "/court", label: "Challenge Court" },
   { href: "/agents", label: "Agent Network" },
   { href: "/proof", label: "Proof Ledger" },
-  { href: "/phase2", label: "Protocol V2 ✦" },
+  { href: "/phase2", label: "Covenant Engine ✦" },
 ];
 
 export function Nav() {

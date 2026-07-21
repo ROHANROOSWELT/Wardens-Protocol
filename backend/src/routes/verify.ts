@@ -74,10 +74,8 @@ verifyRouter.post("/", async (req, res) => {
     // Three x402-paid verifier calls (Section 8).
     const parserCall = await x402Post<VerifierResult>(`${PARSER}/verify/parse`, {
       asset_id,
-      invoice_number: asset_id,
       amount: assetData.face_value,
       due_date: assetData.due_date,
-      invoice_file: `${asset_id}.json`,
     });
     const fraudCall = await x402Post<VerifierResult>(`${FRAUD}/verify/fraud`, {
       asset_id,

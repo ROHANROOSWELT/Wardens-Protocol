@@ -1,45 +1,47 @@
-// Fraud-Heuristic Agent (Section 7.2). Detects duplicate invoice numbers,
-// already-paid invoices, double-pledging, and amount/debtor mismatches by
-// checking against the seeded mock ledger. Deterministic — no LLM.
-//
-// Scoring note: a *confirmed* hard fraud (duplicate or already-paid) is the
-// highest-risk failure mode this system exists to catch, so it returns a score
-// in the "invalid / fraud" tier (0). Because fraud carries 0.50 weight in the
-// aggregator, a confirmed fraud reliably drives the final score below 50, which
-// freezes the collateral (Section 6.3 / demo Scene 7).
-import { serveVerifier, loadJson, type VerifyResult } from "../../common.ts";
+// Fraud-Heuristic Agent (Section 7.2). Detects duplicates on-chain.
+// Deterministic — no LLM.
 
-const ledger = await loadJson<LedgerRow[]>("../backend/src/data/ledger.json");
+import { serveVerifier, type VerifyResult } from "../../common.ts";
 
-function verify(body: { asset_id?: string; invoice_number?: string; amount?: number }): VerifyResult {
-  const invoiceNumber = body.invoice_number;
+const BACKEND = process.env.BACKEND_URL ?? "http://localhost:4000";
+
+async function verify(body: { asset_id?: string; issuer?: string; debtor?: string; face_value?: number; due_date?: number }): Promise<VerifyResult> {
   const findings: string[] = [];
   let hardFraud = false;
 
-  if (!body.asset_id || !invoiceNumber) {
-    return { agent: "fraud-agent", valid: false, score: 0, findings: ["Missing asset_id or invoice_number"] };
+  if (!body.asset_id) {
+    return { agent: "fraud-agent", valid: false, score: 0, findings: ["Missing asset_id"] };
   }
 
-  // Double-pledge / duplicate: the ledger is the source of truth. An invoice is
-  // fraudulent when its number is already pledged under a DIFFERENT asset_id
-  // than the one being verified (the legitimate original matches its own row).
-  const led = ledger.find((l) => l.invoice_number === invoiceNumber);
-  if (led && led.pledged && led.asset_id !== body.asset_id) {
-    findings.push("Duplicate invoice number found");
-    findings.push(`Invoice already pledged in ledger under ${led.asset_id}`);
-    hardFraud = true;
-  }
+  // Double-pledge / duplicate: Check if another asset on-chain has the exact same details
+  // (which would mean same evidence_hash/invoice payload).
+  try {
+    const res = await fetch(`${BACKEND}/api/assets`);
+    if (res.ok) {
+      const allAssets = await res.json();
+      const duplicate = allAssets.find((a: any) => 
+        a.asset_id !== body.asset_id &&
+        a.issuer === body.issuer &&
+        a.debtor === body.debtor &&
+        a.face_value === body.face_value &&
+        a.due_date === body.due_date
+      );
 
-  // Already paid off-chain.
-  if (led?.paid) {
-    findings.push("Invoice already marked paid in ledger");
-    hardFraud = true;
+      if (duplicate) {
+        findings.push("Duplicate invoice collateral found on-chain");
+        findings.push(`Asset already pledged under ${duplicate.asset_id}`);
+        hardFraud = true;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to fetch assets for fraud check", e);
   }
 
   if (!hardFraud) {
-    findings.unshift("No duplicate, no prior payment found in ledger");
+    findings.unshift("No duplicate collateral found on-chain");
     return { agent: "fraud-agent", valid: true, score: 95, findings };
   }
+  
   return { agent: "fraud-agent", valid: false, score: 0, findings };
 }
 

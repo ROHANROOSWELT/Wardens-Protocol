@@ -18,6 +18,7 @@ pub mod lending_vault;
 pub mod covenant_engine;
 pub mod reserve_vault;
 pub mod privacy_commitment_store;
+pub mod external_data_registry;
 
 #[cfg(test)]
 mod tests;

@@ -15,7 +15,7 @@ export default function VaultRegistry() {
   const [agents, setAgents] = useState<any[]>([]);
   
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ issuer: "", debtor: "", faceValue: "", dueDate: "" });
+  const [formData, setFormData] = useState({ issuer: "", debtor: "", faceValue: "", dueDate: "", invoiceNumber: "", invoiceFile: "" });
   const [formError, setFormError] = useState("");
   const [successMsg, setSuccessMsg] = useState<{ id: string, hash: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,9 +29,9 @@ export default function VaultRegistry() {
     e.preventDefault();
     setFormError("");
     setSuccessMsg(null);
-    const { issuer, debtor, faceValue, dueDate } = formData;
-    if (!issuer || !debtor || !faceValue || !dueDate) {
-      return setFormError("All fields are required.");
+    const { issuer, debtor, faceValue, dueDate, invoiceNumber, invoiceFile } = formData;
+    if (!issuer || !debtor || !faceValue || !dueDate || !invoiceNumber) {
+      return setFormError("Issuer, Debtor, Face Value, Due Date, and Invoice Number are required.");
     }
     const fv = Number(faceValue);
     if (isNaN(fv) || fv <= 0) return setFormError("Face value must be > 0.");
@@ -39,12 +39,12 @@ export default function VaultRegistry() {
 
     setBusy(true);
     try {
-      const res = await post("/api/assets", { issuer, debtor, faceValue: fv, dueDate });
+      const res = await post("/api/assets", { issuer, debtor, faceValue: fv, dueDate, invoice_number: invoiceNumber, invoice_file_content: invoiceFile });
       if (!res.ok) {
         setFormError(res.data?.error || "Failed to create asset.");
       } else {
         setShowForm(false);
-        setFormData({ issuer: "", debtor: "", faceValue: "", dueDate: "" });
+        setFormData({ issuer: "", debtor: "", faceValue: "", dueDate: "", invoiceNumber: "", invoiceFile: "" });
         const [a, t, g] = await Promise.all([getAssets(), getTransactions(), getAgents()]);
         setAssets(a); setTxs(t); setAgents(g);
         setSuccessMsg({ id: res.data.asset_id, hash: res.data.deploy_hash });
@@ -120,6 +120,11 @@ export default function VaultRegistry() {
               <h2 className="text-label-md uppercase tracking-widest mb-md border-b-[4px] border-on-surface pb-xs">New Asset</h2>
               <form onSubmit={submitForm} className="flex flex-col gap-sm">
                 <div>
+                  <label className="text-label-md uppercase mb-xs block">Invoice Number</label>
+                  <input type="text" className="w-full neo-border-sm p-xs text-body-md" required placeholder="INV-12345"
+                    value={formData.invoiceNumber} onChange={(e) => setFormData({...formData, invoiceNumber: e.target.value})} />
+                </div>
+                <div>
                   <label className="text-label-md uppercase mb-xs block">Issuer</label>
                   <input type="text" className="w-full neo-border-sm p-xs text-body-md" required placeholder="ABC Corp"
                     value={formData.issuer} onChange={(e) => setFormData({...formData, issuer: e.target.value})} />
@@ -138,6 +143,18 @@ export default function VaultRegistry() {
                   <label className="text-label-md uppercase mb-xs block">Due Date</label>
                   <input type="date" className="w-full neo-border-sm p-xs text-body-md" required
                     value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} />
+                </div>
+                <div>
+                  <label className="text-label-md uppercase mb-xs block">Invoice Document (Optional JSON)</label>
+                  <input type="file" accept=".json" className="w-full neo-border-sm p-xs text-body-md"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => setFormData({...formData, invoiceFile: e.target?.result as string});
+                        reader.readAsText(file);
+                      }
+                    }} />
                 </div>
                 {formError && <div className="text-error text-label-md uppercase bg-error/10 p-xs neo-border-sm border-error">{formError}</div>}
                 <button type="submit" disabled={busy} className="bg-on-surface text-surface neo-border neobrutalist-btn p-xs uppercase text-label-md mt-xs disabled:opacity-50">

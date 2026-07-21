@@ -4,10 +4,13 @@ import { canonicalizeAndHash } from "../services/evidenceHasher.ts";
 
 export const assetsRouter = Router();
 
+// In-memory store for off-chain RWA metadata (simulating IPFS or a secure data vault)
+export const offchainData = new Map<string, { invoice_number: string, invoice_file_content: string }>();
+
 // POST /api/assets — hash invoice data, create the asset on Casper.
 assetsRouter.post("/", async (req, res) => {
   try {
-    let { asset_id, issuer, debtor, faceValue, dueDate } = req.body ?? {};
+    let { asset_id, issuer, debtor, faceValue, dueDate, invoice_number, invoice_file_content } = req.body ?? {};
     
     // Support legacy snake_case for backward compatibility with tests/scripts
     const fv = faceValue !== undefined ? faceValue : req.body.face_value;
@@ -42,6 +45,13 @@ assetsRouter.post("/", async (req, res) => {
       due_date,
       evidence_hash,
     });
+    
+    // Store the off-chain mock file / details
+    offchainData.set(asset_id, {
+      invoice_number: invoice_number || asset_id,
+      invoice_file_content: invoice_file_content || "{}"
+    });
+
     res.json({ deploy_hash: tx.deploy_hash, evidence_hash, asset_id });
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });
@@ -52,4 +62,15 @@ assetsRouter.get("/:asset_id", (req, res) => {
   const a = casper.assets.get(req.params.asset_id);
   if (!a) return res.status(404).json({ error: "AssetNotFound" });
   res.json(a);
+});
+
+assetsRouter.get("/", (req, res) => {
+  const all = Array.from(casper.assets.values());
+  res.json(all);
+});
+
+assetsRouter.get("/doc/:asset_id", (req, res) => {
+  const doc = offchainData.get(req.params.asset_id);
+  if (!doc) return res.status(404).json({ error: "DocumentNotFound" });
+  res.json(doc);
 });

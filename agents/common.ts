@@ -82,8 +82,3 @@ export function serveVerifier(cfg: VerifierConfig): void {
   console.log(`[${cfg.agent}] x402 verifier on :${cfg.port}${cfg.path}`);
 }
 
-// Data loaders shared by agents (read the single seed dataset).
-export async function loadJson<T>(rel: string): Promise<T> {
-  const path = new URL(rel, import.meta.url);
-  return (await Bun.file(path).json()) as T;
-}

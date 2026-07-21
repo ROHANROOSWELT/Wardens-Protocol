@@ -157,7 +157,8 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
  * reads from the node) so errors on one asset do not block the others.
  */
 export async function syncAllFromChain(): Promise<void> {
-  const ASSETS = ["INV-001", "INV-002-DUPLICATE", "INV-003-LYING-SCORE"];
+  // Empty array to ensure zero invoices are loaded by default for live demos.
+  const ASSETS: string[] = [];
   console.log("[chainSync] startup sync: pulling live state from Casper Testnet…");
   for (const assetId of ASSETS) {
     const result = await syncAssetFromChain(assetId);
@@ -171,8 +172,23 @@ export async function syncAllFromChain(): Promise<void> {
       console.warn(`[chainSync] ⚠ ${assetId}: ${result.error}`);
     }
   }
+  
+  // Call with empty string to dump the agent list from the contract 
+  // so the aggregator and challenger agents are loaded.
+  await syncAssetFromChain("");
+
   // agents are populated as a side-effect of the asset dumps above (the dump
   // command always includes aggregator-agent-1 and challenger-agent-1).
+  // But since we skipped assets, we manually seed the known testnet agents:
+  casper.agents.set("aggregator-agent-1", {
+    agent_id: "aggregator-agent-1", role: "aggregator", bonded_amount: 10,
+    reputation: 100, total_reports: 0, successful_reports: 0, slashed_count: 0, active: true
+  });
+  casper.agents.set("challenger-agent-1", {
+    agent_id: "challenger-agent-1", role: "challenger", bonded_amount: 10,
+    reputation: 100, total_reports: 0, successful_reports: 0, slashed_count: 0, active: true
+  });
+  
   const agentCount = casper.agents.size;
   console.log(`[chainSync] startup sync complete — ${casper.assets.size} assets, ${agentCount} agents in read-model.`);
 }
