@@ -25,6 +25,7 @@
   <a href="https://github.com/ROHANROOSWELT/Wardens-Protocol/blob/main/PROOF.md">📜 Testnet Proof</a> •
   <a href="PLAYBOOK.md">📖 DoraHacks Playbook</a> •
   <a href="https://www.youtube.com/watch?v=XzGEAL43tB4">🎥 Demo Video</a> •
+  <a href="https://wardens-protocol.vercel.app">🌍 Live Demo</a> •
   <a href="https://testnet.cspr.live/contract-package/ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de">🔗 Casper Explorer</a>
 </p>
 
@@ -45,7 +46,7 @@
 
 ## ⚡ Judge? Try this in 30 seconds
 
-1. **Open dashboard:** Run `bun run dev` and open `localhost:3000`.
+1. **Open dashboard:** Go to the [Live Demo](https://wardens-protocol.vercel.app) to access the UI.
 2. **Upload invoice:** Register a new asset by uploading a JSON document.
 3. **Run verification:** The Orchestrator pays the Verifier Agents via x402. They parse the JSON and post a Trust Score to the Casper Testnet.
 4. **Challenge verifier:** The background Challenger Agent catches any fraudulent score, pays a counter-bond, and opens a dispute.
