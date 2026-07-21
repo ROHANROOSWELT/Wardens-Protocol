@@ -112,6 +112,29 @@ graph TD
 
 ---
 
+## 🔗 Live Testnet Deployed Contracts
+
+The complete protocol suite is successfully deployed and running on the live Casper Testnet.
+
+### Core Contract (Phase 1)
+| Contract | Casper Testnet Hash |
+| :--- | :--- |
+| **WardensCore** | `contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de` |
+
+### Covenant Engine / Protocol V2 (Phase 2 Modular Architecture)
+| Module | Casper Testnet Hash |
+| :--- | :--- |
+| **AssetRegistry** | `contract-package-8c6e8f1c799d4abc596973d612492e5b5b03643247d0af27a0db363f7e360320` |
+| **ScoreRegistry** | `contract-package-3afb414e8f2f2e2c1db569945dc34fa6705bb5efa3c945c7d37856bff7682590` |
+| **BondVault** | `contract-package-249f599014a2167dab598362451b4c7b591884b7a9e5f3e65f4f31a5e4783f38` |
+| **ChallengeCourt**| `contract-package-83afda159a1e580ccf4baf2144a06a9f753df0db46b5b019e1fe061098f43f27` |
+| **LendingVault** | `contract-package-9b83b046e8749359f1cf096420ff5b029cec12777173ab891aa64d00a736bb09` |
+| **CovenantEngine**| `contract-package-8b3f4001f64a30028bccb919cf9f235bc2b3ff2fc642683d6c799b5d2fbab50e` |
+| **ReserveVault** | `contract-package-c64d65803aa4975709d88f8a039d0b082cb7fed8d000b551a09806424ab08c2f` |
+| **PrivacyStore** | `contract-package-ac2adf6c0770d2ca1ac44bf197469ee23735587c28507f4eb6ce98743ebb9497` |
+
+---
+
 ## ⚙️ Quick Start & Local Run
 
 > 📖 **Full step-by-step replication guide: [SETUP.md](SETUP.md).**
