@@ -5,7 +5,7 @@
   
   <b>⚡ Trust should be continuously earned—not permanently assumed. ⚡</b>
   
-  <img src="docs/screenshot_landing.png" width="800" alt="Dashboard Control Room">
+  <img src="docs/demo.gif" width="800" alt="Demo GIF">
   
   <br /><br />
   
@@ -71,6 +71,8 @@ Casper’s upgradeable contract packages, the Odra framework, and native contrac
 ## 🚀 Quick Demo Flow
 
 <div align="center">
+  <img src="docs/screenshot_landing.png" width="800" alt="Dashboard Control Room">
+  <br /><br />
   <img src="docs/screenshot_registry.png" width="800" alt="Vault Registry">
   <br /><br />
   <img src="docs/screenshot_covenant.png" width="800" alt="Covenant Engine">
