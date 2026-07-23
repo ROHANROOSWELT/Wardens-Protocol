@@ -182,11 +182,13 @@ export async function syncAllFromChain(): Promise<void> {
   // But since we skipped assets, we manually seed the known testnet agents:
   casper.agents.set("aggregator-agent-1", {
     agent_id: "aggregator-agent-1", role: "aggregator", bonded_amount: 10,
-    reputation: 100, total_reports: 0, successful_reports: 0, slashed_count: 0, active: true
+    reputation: 100, total_reports: 0, successful_reports: 0, slashed_count: 0, active: true,
+    x402_price: 1_000_000,
   });
   casper.agents.set("challenger-agent-1", {
     agent_id: "challenger-agent-1", role: "challenger", bonded_amount: 10,
-    reputation: 100, total_reports: 0, successful_reports: 0, slashed_count: 0, active: true
+    reputation: 100, total_reports: 0, successful_reports: 0, slashed_count: 0, active: true,
+    x402_price: 1_000_000,
   });
   
   const agentCount = casper.agents.size;

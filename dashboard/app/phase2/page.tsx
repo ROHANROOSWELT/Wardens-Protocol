@@ -106,7 +106,16 @@ export default function Phase2Dashboard() {
     const challenges = await getJson<any[]>("/api/challenges", []);
     const open = challenges.find((c) => c.status === "Open" || c.status === "InArbitration");
     if (!open) return note("✗ No open challenge to vote on");
-    const arb_id = `arb-${Date.now().toString(36)}`;
+
+    // Use a real registered agent as the arbitrator, not a fabricated client-side ID.
+    const allAgents = await getJson<any[]>("/api/agents", []);
+    const arbAgent = allAgents.find((a: any) =>
+      a.active && (a.role === "Challenger" || a.role === "challenger" ||
+                   a.role === "Aggregator" || a.role === "aggregator")
+    );
+    if (!arbAgent) return note("✗ No active registered agent available to cast vote");
+    const arb_id = arbAgent.agent_id;
+
     const r = await post("/api/p2/arbitration/vote", {
       challenge_id: open.challenge_id,
       arbitrator_id: arb_id,
@@ -114,8 +123,8 @@ export default function Phase2Dashboard() {
     });
     if (r.ok) {
       note(r.data.resolved
-        ? `✓ Vote cast → Challenge #${open.challenge_id} auto-resolved (upheld=${r.data.upheld})`
-        : `✓ Vote cast (${r.data.upheld_votes}/${r.data.needed} needed)`);
+        ? `✓ Vote cast by ${arb_id} → Challenge #${open.challenge_id} auto-resolved (upheld=${r.data.upheld})`
+        : `✓ Vote cast by ${arb_id} (${r.data.upheld_votes}/${r.data.needed} needed)`);
     } else {
       note(`✗ ${r.data.error}`);
     }

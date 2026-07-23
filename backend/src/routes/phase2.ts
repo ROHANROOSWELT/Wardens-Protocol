@@ -44,8 +44,11 @@ function runPhase2LivenetCmd(args: string[]): Promise<{ stdout: string; stderr: 
     child.on("close", (code) => {
       if (code !== 0) return reject(new Error(`Command failed (exit ${code}): ${stderr || stdout}`));
       const match = stdout.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i) || stdout.match(/transaction\s*([a-fA-F0-9]{64})/i) || stdout.match(/hash:\s*([a-fA-F0-9]{64})/i);
-      const deployHash = match ? match[1] : `tx-${Date.now()}`;
-      resolve({ stdout, stderr, deployHash });
+      // Reject if no real on-chain deploy hash found — never fabricate a fake hash.
+      if (!match) {
+        return reject(new Error(`No deploy hash in Phase2 CLI output. Raw output: ${(stdout + stderr).slice(-600)}`));
+      }
+      resolve({ stdout, stderr, deployHash: match[1] });
     });
   });
 }
@@ -141,7 +144,11 @@ phase2Router.post("/reserve/tranche", async (req, res) => {
       if (!hash) return res.status(500).json({ error: "WARDENS_RESERVE_VAULT_HASH not configured" });
       const { stdout } = await runPhase2LivenetCmd(["call", "ReserveVault", hash, "create_tranche", asset_id, String(amount || 0)]);
       const match = stdout.match(/TRANCHE_ID=(\d+)/);
-      const tranche_id = match ? Number(match[1]) : Date.now();
+      // Reject if the on-chain contract did not return a tranche ID — never fabricate one.
+      if (!match) {
+        return res.status(502).json({ error: "No TRANCHE_ID in contract output — on-chain call may have failed", raw: stdout.slice(-400) });
+      }
+      const tranche_id = Number(match[1]);
       res.json({ tranche_id, asset_id, amount, on_chain: true });
     } else {
       const tid = ++trancheSeq;
@@ -204,7 +211,11 @@ phase2Router.post("/privacy/commit", async (req, res) => {
       if (!hash) return res.status(500).json({ error: "WARDENS_PRIVACY_STORE_HASH not configured" });
       const { stdout } = await runPhase2LivenetCmd(["call", "PrivacyCommitmentStore", hash, "store_commitment", asset_id, committer ?? "anonymous", merkle_root]);
       const match = stdout.match(/COMMITMENT_ID=(\d+)/);
-      const commitment_id = match ? Number(match[1]) : Date.now();
+      // Reject if the on-chain contract did not return a commitment ID — never fabricate one.
+      if (!match) {
+        return res.status(502).json({ error: "No COMMITMENT_ID in contract output — on-chain call may have failed", raw: stdout.slice(-400) });
+      }
+      const commitment_id = Number(match[1]);
       res.json({ commitment_id, asset_id, merkle_root, on_chain: true, message: "Commitment stored on-chain (Merkle root only)" });
     } else {
       const cid = ++commitSeq;
@@ -258,15 +269,15 @@ phase2Router.get("/privacy/commitments/:asset_id", (req, res) => {
 // ── Verifier marketplace: list + price discovery ──────────────────────────
 
 // Dynamic x402 price discovery: returns the current price for each agent.
-// In Phase 2 this is on-chain via BondVault.get_agent().x402_price; for the
-// demo, prices are read from the in-memory agent records.
+// Prices are stored on the agent record at registration time (sourced from the
+// BondVault.get_agent().x402_price field in chain mode via registerAgent).
 phase2Router.get("/marketplace/prices", (_req, res) => {
   const agents = [...casper.agents.values()];
   const prices = agents.map((a) => ({
     agent_id: a.agent_id,
     role: a.role,
     reputation: a.reputation,
-    x402_price: 1_000_000, // base price — Phase 2 TODO: read from on-chain BondVault
+    x402_price: a.x402_price, // live from agent record — never a hardcoded constant
     reputation_discount_pct: Math.min(50, Math.floor(a.reputation / 4)), // up to 50% discount
   }));
   res.json(prices);
@@ -279,12 +290,18 @@ phase2Router.post("/marketplace/register", async (req, res) => {
     if (!agent_id) return res.status(400).json({ error: "agent_id required" });
     const tx = await casper.registerAgent(agent_id, role);
     await casper.postBond(agent_id, Number(bond_amount ?? 5));
+    // Store the caller-supplied x402_price on the agent so marketplace/prices
+    // reflects a real value, not the registration default.
+    if (x402_price !== undefined) {
+      const agent = casper.agents.get(agent_id);
+      if (agent) agent.x402_price = Number(x402_price);
+    }
     res.json({
       deploy_hash: tx.deploy_hash,
       agent_id,
       role,
       bond_amount,
-      x402_price,
+      x402_price: casper.agents.get(agent_id)?.x402_price,
       message: "External verifier registered in BondVault",
     });
   } catch (e) {

@@ -49,6 +49,9 @@ export interface Agent {
   successful_reports: number;
   slashed_count: number;
   active: boolean;
+  /** x402 payment price in motes. Sourced from BondVault.get_agent().x402_price in chain mode,
+   *  or set at registration time in sim mode. Never a hardcoded constant. */
+  x402_price: number;
 }
 
 export interface TrustScore {
@@ -135,8 +138,11 @@ function runLivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string
         combined.match(/(?:deploy|transaction)\/([a-fA-F0-9]{64})/i) ||
         combined.match(/(?:deploy|transaction) hash:?\s*([a-fA-F0-9]{64})/i) ||
         combined.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i);
-      const deployHash = match ? match[1] : `tx-${Date.now()}`;
-      resolve({ stdout, stderr, deployHash });
+      // Reject if no real on-chain deploy hash found — never fabricate a fake hash.
+      if (!match) {
+        return reject(new Error(`No deploy hash in CLI output. Raw output: ${combined.slice(-600)}`));
+      }
+      resolve({ stdout, stderr, deployHash: match[1] });
     });
   });
 }
@@ -248,6 +254,7 @@ class WardensCoreSim {
       successful_reports: 0,
       slashed_count: 0,
       active: true,
+      x402_price: 1_000_000, // default base price; caller can override via marketplace/register
     });
     return this.record("register_agent", { agent_id, role }, `Agent ${agent_id} registered`);
   }
