@@ -22,9 +22,61 @@
 ---
 
 ## 🏆 The Vision: Solving the "Stale Collateral" Crisis
-In traditional Decentralized Finance (DeFi) and Real-World Asset (RWA) lending, collateral is checked once during onboarding and then largely ignored. If an invoice defaults, a shipping container sinks, or a physical asset degrades, the on-chain smart contract has no idea. **The collateral becomes stale, creating massive systemic risk.**
+In traditional Decentralized Finance (DeFi) and Real-World Asset (RWA) lending, collateral is checked once during onboarding and then largely ignored. If an invoice defaults, a shipping container sinks, or a physical asset degrades, the on-chain smart contract has no idea. **The collateral becomes stale, creating systemic risk.**
 
-**Wardens Protocol** is a 100% on-chain decentralized oracle network built natively on the Casper Network to solve this. It replaces static collateral with a continuous, hyper-vigilant market of autonomous AI and deterministic verifier agents that constantly monitor, score, and challenge RWA collateral in real-time.
+**Wardens Protocol** is a 100% on-chain decentralized oracle network built natively on the Casper Network. It replaces static collateral with a continuous market of autonomous AI and deterministic verifier agents that monitor, score, and challenge RWA collateral in real-time.
+
+---
+
+## 🚀 Quick Demo Flow
+
+To see the system in action, follow these steps on the [Live Dashboard](https://wardens-protocol.vercel.app):
+
+1. **Upload RWA Invoice:** Submit a JSON invoice payload to register a new asset.
+2. **Agents Verify (x402):** The backend pays verifier agents via x402 micropayments to parse the payload.
+3. **Score Submitted:** Agents post a deterministic Trust Score (0-100) on-chain.
+4. **Challenge Opens:** The background Challenger Agent catches fraudulent scores and opens a dispute.
+5. **Arbitration Vote:** Other bonded agents vote on the dispute on-chain.
+6. **Slash & Freeze:** The dishonest verifier's bond is slashed, and the collateral's Loan-to-Value (LTV) is frozen.
+
+---
+
+## 🏛️ System Architecture
+
+The protocol features a hybrid deployment model utilizing Edge rendering, Azure orchestration, and Casper smart contracts.
+
+```mermaid
+graph TD
+    Client[User/Dashboard] -->|Next.js API Routes| UI[Vercel Edge Network]
+    UI -->|Proxy| Backend[Azure Backend Orchestrator]
+    
+    Backend -->|x402 Micropayments| AgentNet[Local PM2 Agent Network]
+    
+    subgraph Agent Network
+        Parser[Parser Agent]
+        Fraud[Fraud Agent]
+        Registry[Registry Agent]
+    end
+    
+    AgentNet --> Backend
+    
+    Backend -->|RPC via Livenet Executor| Casper[Casper Testnet]
+    
+    subgraph Casper Blockchain
+        Contracts[8 Odra Smart Contracts]
+        RegistrySC[Score & Asset Registry]
+        Vaults[Bond & Lending Vaults]
+        Court[Challenge Court]
+        
+        Contracts --> RegistrySC
+        Contracts --> Vaults
+        Contracts --> Court
+    end
+    
+    Challenger[Challenger Agent] -->|Polls State| Casper
+    Challenger -->|Triggers Dispute| Court
+    Aggregator[Aggregator Agent] -->|Submits Final Score| RegistrySC
+```
 
 ---
 
@@ -32,63 +84,74 @@ In traditional Decentralized Finance (DeFi) and Real-World Asset (RWA) lending, 
 
 | Feature | Description |
 | :--- | :--- |
-| **100% ON-CHAIN** | Absolutely zero mocked endpoints. Every RWA score, agent bond, and arbitration vote is a real cryptographic deploy executed via our Rust Livenet Executor on the Casper Testnet. |
-| **8 Smart Contracts** | Highly modular "Covenant Engine" architecture built strictly in Rust using the Odra Framework. |
+| **100% ON-CHAIN** | Zero mocked endpoints. RWA scores, agent bonds, and arbitration votes are real cryptographic deploys on the Casper Testnet. |
+| **8 Smart Contracts** | Modular "Covenant Engine" architecture built strictly in Rust using the Odra Framework. |
 | **5 Autonomous Agents** | Specialized microservices executing parallel verification logic (Parser, Fraud, Registry, Aggregator, Challenger). |
-| **x402 Micropayments** | Cutting-edge HTTP 402 API monetization. Agents demand cryptographic micropayment proofs before executing validation. |
-| **Production Architecture** | A robust hybrid deployment: Next.js edge-rendered UI on Vercel, securely proxying to a dedicated Microsoft Azure VM running our Node.js Orchestrator and PM2 Agent Daemon. |
+| **x402 Micropayments** | Native HTTP 402 API monetization. Agents demand cryptographic micropayment proofs before executing validation. |
+| **Deployment** | Fully deployed across the Casper Testnet, Microsoft Azure (Backend & PM2 agents), and Vercel (Frontend). |
 
 ---
 
-## 🚀 How It Works (The 100% On-Chain Flow)
+## 📂 Repository Structure
 
-1. **Verify (x402 Handshake):** An RWA issuer uploads an invoice. The Backend Orchestrator initiates an unauthenticated request to the verifier agents. The agents reply with an `HTTP 402 Payment Required`. The Orchestrator pays the micropayment, receives an `x402_receipt`, and the agents parse the RWA metadata.
-2. **Score (Casper Smart Contracts):** Agents execute strict deterministic heuristics to validate the asset. The final Trust Score (0-100) is submitted directly to the `ScoreRegistry` smart contract on the Casper Testnet. 
-3. **Challenge (Arbitration Court):** A background "Challenger Agent" continuously pulls state from the Casper blockchain. If it catches a verifier hallucinating or lying, it pays a "Counter Bond" and opens an on-chain dispute in the `ChallengeCourt` contract. 
+```text
+├── agents/                 # Autonomous Node.js microservices (Parser, Fraud, etc.)
+├── backend/                # Express.js orchestrator (PM2 entrypoint)
+├── contracts/              # Rust smart contracts using Odra Framework
+│   ├── wardens_core/       # Phase 1 Monolithic contract
+│   └── wardens_phase2/     # Phase 2 Modular Covenant Engine (8 contracts)
+├── dashboard/              # Next.js 15 UI frontend
+├── scripts/                # Deployment and orchestration scripts
+├── ecosystem.config.js     # PM2 daemon configuration
+└── README.md
+```
+
+---
+
+## ⚙️ How It Works (The 100% On-Chain Flow)
+
+1. **Verify (x402 Handshake):** An RWA issuer uploads an invoice. The Backend Orchestrator initiates an unauthenticated request to the verifier agents. The agents reply with an `HTTP 402 Payment Required`. The Orchestrator processes the micropayment, receives an `x402_receipt`, and the agents parse the metadata.
+2. **Score (Casper Smart Contracts):** Agents execute strict deterministic heuristics to validate the asset. The final Trust Score (0-100) is submitted directly to the `ScoreRegistry` smart contract. 
+3. **Challenge (Arbitration Court):** A background "Challenger Agent" continuously polls state from the blockchain. If it detects a fraudulent score, it pays a "Counter Bond" and opens an on-chain dispute in the `ChallengeCourt`. 
 4. **Slash & Freeze (Covenant Engine):** Other registered agents cast their votes on-chain. If the verifier is proven wrong, its bonded CSPR is permanently slashed, and the `CovenantEngine` instantly drops the asset's Loan-to-Value (LTV) to 0%, freezing the vault.
 
 ---
 
-## 🏛️ Smart Contract Architecture (Phase 1 & Phase 2)
+## 📜 Smart Contract Architecture (Phase 1 & Phase 2)
 
-We built an incredibly ambitious, dual-phase contract suite using the **Odra Framework** for Casper.
+We built a dual-phase contract suite using the **Odra Framework** for Casper.
 
 ### Phase 1: `WardensCore`
 The original monolithic contract that handles end-to-end asset registration, basic agent bonding, score submission, and rudimentary LTV freezing.
 
 ### Phase 2: Protocol V2 (The Covenant Engine Suite)
-To prove enterprise scalability, we shattered the monolith into **8 distinct modular contracts**:
+To support modular upgrades, the monolith was refactored into **8 distinct contracts**:
 1. **AssetRegistry:** Tokenizes RWA metadata and baseline status.
 2. **ScoreRegistry:** Stores the immutable ledger of agent-submitted trust scores.
 3. **BondVault:** Escrows the Casper token (CSPR) stakes deposited by verifier agents.
 4. **ChallengeCourt:** Handles multi-agent voting arbitration and on-chain dispute resolutions.
 5. **LendingVault:** A DeFi lending pool that algorithmically enforces LTV limits based on Trust Scores.
-6. **CovenantEngine:** A programmatic rule-engine assigning strict compliance states (Full Access, Monitored, Draws Frozen, Breach Mode).
+6. **CovenantEngine:** A programmatic rule-engine assigning compliance states (Full Access, Monitored, Draws Frozen, Breach Mode).
 7. **ReserveVault:** Manages locked capital tranches released only when Covenant Engine state allows.
-8. **PrivacyStore:** A Merklized data registry for zero-knowledge evidence hashes, keeping sensitive RWA data off-chain while maintaining verifiability.
+8. **PrivacyStore:** A Merklized data registry for zero-knowledge evidence hashes.
 
 ---
 
 ## 🤖 The Autonomous Agent Network
 
-The protocol relies on a microservice architecture of independent Node.js/Bun agents. To optimize gas and on-chain state, we employ a **Hybrid Registry Strategy**: all 5 agents run continuously in the background via PM2 on Azure, but only the critical public actors (Aggregator and Challenger) lock up public cryptographic bonds on the Casper blockchain.
+The protocol relies on a microservice architecture of independent Node.js agents. We employ a **Hybrid Registry Strategy**: all 5 agents run continuously via PM2 on Azure, but only the public actors (Aggregator and Challenger) lock up public cryptographic bonds on the Casper blockchain to save gas.
 
-1. **Parser Agent (`:4101`)**: Downloads the raw JSON invoice, parsing data to ensure claimed `amount` and `due_date` perfectly match the cryptographic metadata.
-2. **Fraud Agent (`:4102`)**: Scans live blockchain state for duplicate invoice hashes or suspiciously identical face values across different issuers.
+1. **Parser Agent (`:4101`)**: Parses the JSON invoice to ensure claimed `amount` and `due_date` match the cryptographic metadata.
+2. **Fraud Agent (`:4102`)**: Scans live blockchain state for duplicate invoice hashes or suspicious face values.
 3. **Registry Agent (`:4103`)**: Performs algorithmic heuristic checks on issuer and debtor credentials.
-4. **Aggregator Agent (On-Chain Verifier)**: Collects scores from the internal agents, drops extreme outliers, and submits the finalized Trust Score to Casper.
-5. **Challenger Agent (On-Chain Auditor)**: An autonomous one-shot cron job that audits scores. If it detects fraud, it interacts with the `ChallengeCourt` contract to slash the aggregator.
+4. **Aggregator Agent (On-Chain Verifier)**: Collects scores, drops extreme outliers, and submits the finalized Trust Score to Casper.
+5. **Challenger Agent (On-Chain Auditor)**: An autonomous cron job that audits scores. If it detects fraud, it interacts with the `ChallengeCourt` contract to slash the aggregator.
 
 ---
 
 ## 🔗 Live Testnet Deployed Contracts
 
-The complete protocol suite is successfully deployed and running on the live Casper Testnet.
-
-### Core Contract (Phase 1)
-| Contract | Casper Testnet Hash |
-| :--- | :--- |
-| **WardensCore** | `contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de` |
+The complete protocol suite is successfully deployed on the live Casper Testnet.
 
 ### Covenant Engine / Protocol V2 (Phase 2 Modular Architecture)
 | Module | Casper Testnet Hash |
@@ -102,12 +165,61 @@ The complete protocol suite is successfully deployed and running on the live Cas
 | **ReserveVault** | `contract-package-c64d65803aa4975709d88f8a039d0b082cb7fed8d000b551a09806424ab08c2f` |
 | **PrivacyStore** | `contract-package-ac2adf6c0770d2ca1ac44bf197469ee23735587c28507f4eb6ce98743ebb9497` |
 
+### Core Contract (Phase 1)
+| Contract | Casper Testnet Hash |
+| :--- | :--- |
+| **WardensCore** | `contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de` |
+
 ---
 
-## 🏆 Why This Entry Wins (Buildathon Specs)
-**Wardens Protocol is not a mockup.** It is a massive, meticulously engineered ecosystem.
-* **Flawless Execution**: From the Vercel edge to the Azure VM, straight down to the Rust Livenet Executor, everything functions in production.
-* **Strict Determinism**: We do not rely on AI hallucinations for slashing. All agent validation is 100% deterministic and mathematically provable on-chain.
-* **Complete Vision**: We didn't just build a smart contract; we built a frontend dashboard, a backend orchestrator, a fleet of AI agents, and a monetization layer (x402). 
+## 🛠️ Installation & Local Setup
 
-Wardens Protocol brings absolute trust, programmatic enforcement, and automated liquidation to the $10 Trillion Real-World Asset market.
+### 1. Clone the Repository
+```bash
+git clone https://github.com/ROHANROOSWELT/Wardens-Protocol.git
+cd Wardens-Protocol
+```
+
+### 2. Build the Rust Smart Contracts
+*Requires Rust and Cargo to be installed.*
+```bash
+cd contracts/wardens_core
+cargo build --release --features livenet --bin wardens_livenet
+
+cd ../wardens_phase2
+cargo build --release --features livenet --bin wardens_phase2_livenet
+```
+
+### 3. Start the Backend and Agents
+*Requires [Bun](https://bun.sh/) and [PM2](https://pm2.keymetrics.io/).*
+```bash
+cd backend
+bun install
+cd ..
+
+# Start the orchestrator and all agents via PM2
+pm2 start ecosystem.config.js
+```
+
+### 4. Run the Dashboard
+```bash
+cd dashboard
+bun install
+bun run dev
+```
+Open `http://localhost:3000` to interact with the local dashboard.
+
+---
+
+## 🗺️ Roadmap
+
+- **Q4 2026:** Casper Mainnet Deployment.
+- **Q1 2027:** Zero-Knowledge (ZK) Proof integration for private invoice verification.
+- **Q2 2027:** Integration with major real-world Oracle providers (Chainlink, Pyth).
+- **Q3 2027:** Decentralized DAO governance for updating Covenant Engine rules.
+- **Q4 2027:** Multi-chain bridging and support.
+
+---
+
+## 📄 License
+MIT — see `LICENSE` for details.
