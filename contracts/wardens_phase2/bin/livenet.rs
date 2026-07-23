@@ -121,6 +121,11 @@ fn main() {
                 c.reveal_commitment(args[5].parse().unwrap(), args[6].clone());
                 println!("STATUS: OK");
             }
+            ("ChallengeCourt", "cast_vote") => {
+                let mut c = wardens_phase2::challenge_court::ChallengeCourt::load(&env, contract_hash);
+                let resolved = c.cast_vote(args[5].parse().unwrap(), args[6].clone(), args[7].parse().unwrap());
+                println!("RESOLVED={}", resolved);
+            }
             _ => {
                 println!("Unsupported call or method");
             }

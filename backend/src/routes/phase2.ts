@@ -71,6 +71,17 @@ phase2Router.post("/arbitration/vote", async (req, res) => {
       return res.status(400).json({ error: "ChallengeAlreadyResolved" });
     }
 
+    if (process.env.WARDENS_MODE === "chain") {
+      const hash = process.env.WARDENS_CHALLENGE_COURT_HASH;
+      if (!hash) return res.status(500).json({ error: "WARDENS_CHALLENGE_COURT_HASH not configured" });
+      const { stdout, deployHash } = await runPhase2LivenetCmd([
+        "call", "ChallengeCourt", hash, "cast_vote", String(challenge_id), arbitrator_id, String(vote_upheld)
+      ]);
+      const match = stdout.match(/RESOLVED=(true|false)/i);
+      const resolved = match ? match[1].toLowerCase() === "true" : false;
+      return res.json({ vote_cast: true, resolved, deploy_hash: deployHash, on_chain: true });
+    }
+
     // Update vote counts in memory (on-chain: ChallengeCourt.cast_vote deploy).
     const voteKey = `votes:${challenge_id}`;
     const votes: { upheld: string[]; rejected: string[] } =
