@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://via.placeholder.com/150/1a1a1a/ffffff?text=LOGO" width="150" alt="Wardens Protocol Logo">
+  <img src="docs/logo.png" width="150" alt="Wardens Protocol Logo">
   
   # Wardens Protocol
   
@@ -7,7 +7,7 @@
   
   <br />
   
-  <img src="https://via.placeholder.com/800x400/1a1a1a/ffffff?text=DASHBOARD+SCREENSHOT" width="800" alt="Dashboard Screenshot">
+  <img src="docs/demo.webp" width="800" alt="Dashboard Screenshot">
   
   <br /><br />
   
@@ -73,7 +73,7 @@ Casper’s upgradeable contract packages, the Odra framework, and native contrac
 ## 🚀 Quick Demo Flow
 
 <div align="center">
-  <img src="https://via.placeholder.com/600x300/1a1a1a/ffffff?text=ANIMATED+DEMO+GIF" width="600" alt="Demo GIF">
+  <img src="docs/demo.webp" width="600" alt="Demo GIF">
 </div>
 
 1. **Upload Invoice:** Submit a JSON payload to register a new asset.
