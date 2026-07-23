@@ -86,7 +86,9 @@ export interface VaultPosition {
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url)); // repo root
 const CONTRACT_DIR = `${ROOT}/contracts/wardens_core`;
-const BIN = `${CONTRACT_DIR}/target/debug/wardens_livenet`;
+const RELEASE_BIN = `${CONTRACT_DIR}/target/release/wardens_livenet`;
+const DEBUG_BIN = `${CONTRACT_DIR}/target/debug/wardens_livenet`;
+const BIN = existsSync(RELEASE_BIN) ? RELEASE_BIN : DEBUG_BIN;
 const MODE = process.env.WARDENS_MODE ?? "sim";
 
 function formatAddress(addr: string): string {
