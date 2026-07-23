@@ -18,14 +18,14 @@ async function runChallenger() {
     const assetsRes = await fetch(`${BACKEND}/api/assets`);
     if (!assetsRes.ok) {
       console.error(`[challenger-agent] Failed to fetch on-chain assets.`);
-      process.exit(1);
+      process.exit(0); // not an error — backend may not be ready yet
     }
     const assets = await assetsRes.json();
     const targetAsset = assets.find((a: any) => a.asset_id === assetId);
 
     if (!targetAsset) {
-      console.error(`[challenger-agent] Asset ${assetId} not found on-chain.`);
-      process.exit(1);
+      console.log(`[challenger-agent] Asset ${assetId} not found yet — nothing to challenge.`);
+      process.exit(0); // normal: asset hasn't been created yet
     }
 
     const reasons: string[] = [];
@@ -50,8 +50,8 @@ async function runChallenger() {
     // Check if score is posted
     const scoreRes = await fetch(`${BACKEND}/api/challenge/latest-score/${assetId}`);
     if (!scoreRes.ok) {
-      console.error(`[challenger-agent] no posted score for ${assetId} yet`);
-      process.exit(1);
+      console.log(`[challenger-agent] No posted score for ${assetId} yet — nothing to challenge.`);
+      process.exit(0); // normal: score hasn't been submitted yet
     }
     const { score_id } = await scoreRes.json();
     const dash = await (await fetch(`${BACKEND}/api/dashboard/${assetId}`)).json();
