@@ -5,9 +5,7 @@
   
   <b>⚡ Trust should be continuously earned—not permanently assumed. ⚡</b>
   
-  <br />
-  
-  <img src="docs/demo.webp" width="800" alt="Dashboard Screenshot">
+  <img src="docs/screenshot_landing.png" width="800" alt="Dashboard Control Room">
   
   <br /><br />
   
@@ -73,7 +71,9 @@ Casper’s upgradeable contract packages, the Odra framework, and native contrac
 ## 🚀 Quick Demo Flow
 
 <div align="center">
-  <img src="docs/demo.webp" width="600" alt="Demo GIF">
+  <img src="docs/screenshot_registry.png" width="800" alt="Vault Registry">
+  <br /><br />
+  <img src="docs/screenshot_covenant.png" width="800" alt="Covenant Engine">
 </div>
 
 1. **Upload Invoice:** Submit a JSON payload to register a new asset.
