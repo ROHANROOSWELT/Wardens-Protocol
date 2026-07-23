@@ -1,6 +1,6 @@
 // Thin backend client for the dashboard. The dashboard reads all state from the
 // backend, which reads from the chain (or sim) on each request — no cache layer.
-export const BACKEND = "";
+export const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || "";
 export const EXPLORER =
   process.env.NEXT_PUBLIC_CASPER_EXPLORER_BASE ?? "https://testnet.cspr.live/deploy";
 
