@@ -9,7 +9,7 @@ const sharedEnv = {
 
 module.exports = {
   apps: [
-    { name: 'backend',    script: 'bun', args: 'run dev',     cwd: './backend',                autorestart: true, env: { ...sharedEnv, PORT: '4000' } },
+    { name: 'backend',    script: 'bun', args: 'src/index.ts',  cwd: './backend',                autorestart: true, env: { ...sharedEnv, PORT: '4000' } },
     { name: 'parser',     script: 'bun', args: 'src/index.ts', cwd: './agents/parser-agent',    autorestart: true, env: { ...sharedEnv, PORT: '4101' } },
     { name: 'fraud',      script: 'bun', args: 'src/index.ts', cwd: './agents/fraud-agent',      autorestart: true, env: { ...sharedEnv, PORT: '4102' } },
     { name: 'registry',   script: 'bun', args: 'src/index.ts', cwd: './agents/registry-agent',   autorestart: true, env: { ...sharedEnv, PORT: '4103' } },

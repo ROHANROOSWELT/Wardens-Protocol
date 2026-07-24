@@ -247,8 +247,9 @@ class WardensCoreSim {
           result: `Asset ${a.asset_id} created`,
           timestamp: queuedTx.timestamp,
         };
-        const memIdx = this.txs.indexOf(queuedTx);
-        if (memIdx >= 0) this.txs[memIdx] = realTx;
+        // Scan by placeholder hash (safe across process restarts)
+        const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
+        if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
         replaceTransaction(placeholderHash, realTx);
       }).catch(e => console.error(`[casperClient] createAsset on-chain error:`, e));
 
@@ -293,8 +294,8 @@ class WardensCoreSim {
           result: `Agent ${agent_id} registered`,
           timestamp: queuedTx.timestamp,
         };
-        const memIdx = this.txs.indexOf(queuedTx);
-        if (memIdx >= 0) this.txs[memIdx] = realTx;
+        const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
+        if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
         replaceTransaction(placeholderHash, realTx);
       }).catch(e => console.error(`[casperClient] registerAgent on-chain error:`, e));
 
@@ -333,8 +334,8 @@ class WardensCoreSim {
           result: `Bond ${amount} locked`,
           timestamp: queuedTx.timestamp,
         };
-        const memIdx = this.txs.indexOf(queuedTx);
-        if (memIdx >= 0) this.txs[memIdx] = realTx;
+        const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
+        if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
         replaceTransaction(placeholderHash, realTx);
       }).catch(e => console.error(`[casperClient] postBond on-chain error:`, e));
 
