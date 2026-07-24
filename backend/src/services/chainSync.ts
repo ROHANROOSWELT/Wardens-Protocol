@@ -53,15 +53,21 @@ export function replaceTransaction(
   oldHash: string,
   tx: import("./casperClient.ts").TxRecord
 ) {
-  ensureCacheDir();
-  let txs: import("./casperClient.ts").TxRecord[] = [];
-  if (existsSync(TXS_FILE)) {
-    try { txs = JSON.parse(readFileSync(TXS_FILE, "utf8")); } catch { txs = []; }
+  try {
+    ensureCacheDir();
+    let txs: import("./casperClient.ts").TxRecord[] = [];
+    if (existsSync(TXS_FILE)) {
+      try { txs = JSON.parse(readFileSync(TXS_FILE, "utf8")); } catch { txs = []; }
+    }
+    const before = txs.length;
+    // Remove the old placeholder entry
+    txs = txs.filter((t) => t.deploy_hash !== oldHash);
+    txs.push(tx);
+    writeFileSync(TXS_FILE, JSON.stringify(txs));
+    console.log(`[chainSync] replaceTransaction: swapped ${oldHash.slice(0,20)}... -> ${tx.deploy_hash.slice(0,20)}... (was ${before} txs, now ${txs.length})`);
+  } catch (e) {
+    console.error(`[chainSync] replaceTransaction FAILED:`, e);
   }
-  // Remove the old placeholder entry
-  txs = txs.filter((t) => t.deploy_hash !== oldHash);
-  txs.push(tx);
-  writeFileSync(TXS_FILE, JSON.stringify(txs));
 }
 
 function loadPersistedTransactions() {
