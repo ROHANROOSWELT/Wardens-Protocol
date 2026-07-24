@@ -228,6 +228,7 @@ class WardensCoreSim {
         a.due_date.toString(),
         a.evidence_hash,
       ]).then(async ({ deployHash }) => {
+        console.log(`[casperClient] SUCCESS: Asset ${a.asset_id} created on-chain with deploy hash: ${deployHash}`);
         await syncAssetFromChain(a.asset_id);
         const tx: TxRecord = {
           action: "create_asset",
