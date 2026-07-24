@@ -54,13 +54,15 @@ ssh -i $KEY -o StrictHostKeyChecking=no $USER@$IP << 'EOF'
   # 4. Generate PM2 Ecosystem Configuration
   cd ~/wardens
   cat << 'PM2EOF' > ecosystem.config.js
+const BUN = '/home/azureuser/.bun/bin/bun';
+const ENV = { PATH: '/home/azureuser/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' };
 module.exports = {
   apps: [
-    { name: 'backend', script: 'bun', args: 'run start', cwd: './backend', env: { WARDENS_MODE: 'chain' } },
-    { name: 'parser', script: 'bun', args: 'src/index.ts', cwd: './agents/parser-agent' },
-    { name: 'fraud', script: 'bun', args: 'src/index.ts', cwd: './agents/fraud-agent' },
-    { name: 'registry', script: 'bun', args: 'src/index.ts', cwd: './agents/registry-agent' },
-    { name: 'dashboard', script: 'bun', args: 'run start', cwd: './dashboard', env: { PORT: '3000' } }
+    { name: 'backend',  script: BUN, args: 'src/index.ts', cwd: './backend',              env: { ...ENV, WARDENS_MODE: 'chain' } },
+    { name: 'parser',   script: BUN, args: 'src/index.ts', cwd: './agents/parser-agent',  env: ENV },
+    { name: 'fraud',    script: BUN, args: 'src/index.ts', cwd: './agents/fraud-agent',   env: ENV },
+    { name: 'registry', script: BUN, args: 'src/index.ts', cwd: './agents/registry-agent',env: ENV },
+    { name: 'dashboard',script: BUN, args: 'run start',    cwd: './dashboard',            env: { ...ENV, PORT: '3000' } },
   ]
 };
 PM2EOF
