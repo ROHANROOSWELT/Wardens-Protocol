@@ -17,7 +17,7 @@ rsync -az -e "ssh -i $KEY -o StrictHostKeyChecking=no" \
 
 echo "Step 2/4: Copying Casper blockchain private key..."
 ssh -i $KEY -o StrictHostKeyChecking=no $USER@$IP "mkdir -p ~/Desktop/keys"
-scp -i $KEY -o StrictHostKeyChecking=no /home/rohan/Desktop/keys/secret_key.pem $USER@$IP:~/Desktop/keys/secret_key.pem
+scp -i $KEY -o StrictHostKeyChecking=no /home/rohan/Desktop/keys/* $USER@$IP:~/Desktop/keys/
 
 echo "Step 3/4: Setting up server dependencies and building Next.js (This takes 2-3 minutes)..."
 ssh -i $KEY -o StrictHostKeyChecking=no $USER@$IP << 'EOF'
@@ -55,7 +55,7 @@ ssh -i $KEY -o StrictHostKeyChecking=no $USER@$IP << 'EOF'
   cat << 'PM2EOF' > ecosystem.config.js
 module.exports = {
   apps: [
-    { name: 'backend', script: 'bun', args: 'run dev', cwd: './backend', env: { WARDENS_MODE: 'chain' } },
+    { name: 'backend', script: 'bun', args: 'run start', cwd: './backend', env: { WARDENS_MODE: 'chain' } },
     { name: 'parser', script: 'bun', args: 'src/index.ts', cwd: './agents/parser-agent' },
     { name: 'fraud', script: 'bun', args: 'src/index.ts', cwd: './agents/fraud-agent' },
     { name: 'registry', script: 'bun', args: 'src/index.ts', cwd: './agents/registry-agent' },
