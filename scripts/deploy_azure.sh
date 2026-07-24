@@ -30,7 +30,8 @@ ssh -i $KEY -o StrictHostKeyChecking=no $USER@$IP << 'EOF'
   export PATH="$HOME/.bun/bin:$PATH"
 
   # 2. Setup Port 80 Forwarding so judges can just type the IP in the browser!
-  sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 3000
+  sudo iptables -t nat -C PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 3000 2>/dev/null || \
+    sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 3000
   sudo iptables-save | sudo tee /etc/iptables.rules > /dev/null 2>&1
 
   # 3. Install dependencies in parallel
@@ -65,7 +66,7 @@ module.exports = {
 PM2EOF
 
   echo "--> Launching entire ecosystem in the background!"
-  pm2 start ecosystem.config.js
+  pm2 startOrRestart ecosystem.config.js
   pm2 save
 EOF
 
