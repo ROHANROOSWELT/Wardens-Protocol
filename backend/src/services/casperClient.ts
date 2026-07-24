@@ -209,6 +209,8 @@ class WardensCoreSim {
         timestamp: Date.now(),
       };
       this.txs.push(tx);
+      const { persistTransaction } = await import("./chainSync.ts");
+      persistTransaction(tx);
       return tx;
     }
 
@@ -241,6 +243,8 @@ class WardensCoreSim {
         timestamp: Date.now(),
       };
       this.txs.push(tx);
+      const { persistTransaction } = await import("./chainSync.ts");
+      persistTransaction(tx);
       return tx;
     }
 
@@ -276,6 +280,8 @@ class WardensCoreSim {
         timestamp: Date.now(),
       };
       this.txs.push(tx);
+      const { persistTransaction } = await import("./chainSync.ts");
+      persistTransaction(tx);
       return tx;
     }
 
@@ -314,6 +320,8 @@ class WardensCoreSim {
         timestamp: Date.now(),
       };
       this.txs.push(tx);
+      const { persistTransaction } = await import("./chainSync.ts");
+      persistTransaction(tx);
       return { ...tx, score_id };
     }
 

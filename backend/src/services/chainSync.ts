@@ -22,6 +22,36 @@ const STATE_FILE = `${ROOT}/scripts/.chain_state`;
 const CACHE_DIR = `${ROOT}/backend/.local`;
 const CACHE_FILE = `${CACHE_DIR}/chain_cache.json`;
 const ASSETS_FILE = `${CACHE_DIR}/tracked_assets.json`;
+const TXS_FILE = `${CACHE_DIR}/transactions.json`;
+
+function ensureCacheDir() {
+  if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+export function persistTransaction(tx: import("./casperClient.ts").TxRecord) {
+  ensureCacheDir();
+  let txs: import("./casperClient.ts").TxRecord[] = [];
+  if (existsSync(TXS_FILE)) {
+    try { txs = JSON.parse(readFileSync(TXS_FILE, "utf8")); } catch { txs = []; }
+  }
+  txs.push(tx);
+  writeFileSync(TXS_FILE, JSON.stringify(txs));
+}
+
+function loadPersistedTransactions() {
+  if (!existsSync(TXS_FILE)) return;
+  try {
+    const txs: import("./casperClient.ts").TxRecord[] = JSON.parse(readFileSync(TXS_FILE, "utf8"));
+    // Merge into casper.txs without duplicating existing entries
+    const existingHashes = new Set(casper.txs.map((t) => t.deploy_hash));
+    for (const tx of txs) {
+      if (!existingHashes.has(tx.deploy_hash)) casper.txs.push(tx);
+    }
+    console.log(`[chainSync] loaded ${txs.length} persisted transactions from disk.`);
+  } catch (e) {
+    console.warn("[chainSync] could not load persisted transactions:", (e as Error).message);
+  }
+}
 
 function getTrackedAssets(): string[] {
   if (!existsSync(ASSETS_FILE)) return [];
@@ -177,7 +207,8 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
  * reads from the node) so errors on one asset do not block the others.
  */
 export async function syncAllFromChain(): Promise<void> {
-  // Load tracked assets from local file so they survive restarts
+  // Load tracked assets and past transactions from disk so they survive restarts
+  loadPersistedTransactions();
   const ASSETS: string[] = getTrackedAssets();
   console.log(`[chainSync] startup sync: pulling live state from Casper Testnet for ${ASSETS.length} assets…`);
   for (const assetId of ASSETS) {
