@@ -217,8 +217,15 @@ class WardensCoreSim {
       trackAssetLocally(a.asset_id);
 
       const placeholderHash = "cspr-" + a.evidence_hash.substring(7, 39);
+      const queuedTx: TxRecord = {
+        action: "create_asset",
+        deploy_hash: placeholderHash,
+        result: `Asset ${a.asset_id} queued on-chain`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(queuedTx);
 
-      // Submit to Casper Testnet asynchronously in background to prevent HTTP gateway timeouts on Vercel
+      // Submit to Casper Testnet asynchronously in background
       runLivenetCmd([
         "create_asset",
         a.asset_id,
@@ -230,22 +237,14 @@ class WardensCoreSim {
       ]).then(async ({ deployHash }) => {
         console.log(`[casperClient] SUCCESS: Asset ${a.asset_id} created on-chain with deploy hash: ${deployHash}`);
         await syncAssetFromChain(a.asset_id);
-        const tx: TxRecord = {
-          action: "create_asset",
-          deploy_hash: deployHash,
-          result: `Asset ${a.asset_id} created`,
-          timestamp: Date.now(),
-        };
-        this.txs.push(tx);
-        persistTransaction(tx);
+        
+        // Mutate the queued transaction into a confirmed on-chain transaction
+        queuedTx.deploy_hash = deployHash;
+        queuedTx.result = `Asset ${a.asset_id} created`;
+        persistTransaction(queuedTx);
       }).catch(e => console.error(`[casperClient] createAsset on-chain error:`, e));
 
-      return {
-        action: "create_asset",
-        deploy_hash: placeholderHash,
-        result: `Asset ${a.asset_id} queued on-chain`,
-        timestamp: Date.now(),
-      };
+      return queuedTx;
     }
 
     return this.record("create_asset", a, `Asset ${a.asset_id} created`);
@@ -265,28 +264,27 @@ class WardensCoreSim {
     });
 
     if (MODE === "chain") {
+      const queuedTx: TxRecord = {
+        action: "register_agent",
+        deploy_hash: `cspr-reg-${Date.now()}`,
+        result: `Agent ${agent_id} queued on-chain`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(queuedTx);
+
       runLivenetCmd([
         "register_agent",
         agent_id,
         role.toLowerCase(),
       ]).then(async ({ deployHash }) => {
         const { persistTransaction } = await import("./chainSync.ts");
-        const tx: TxRecord = {
-          action: "register_agent",
-          deploy_hash: deployHash,
-          result: `Agent ${agent_id} registered`,
-          timestamp: Date.now(),
-        };
-        this.txs.push(tx);
-        persistTransaction(tx);
+        
+        queuedTx.deploy_hash = deployHash;
+        queuedTx.result = `Agent ${agent_id} registered`;
+        persistTransaction(queuedTx);
       }).catch(e => console.error(`[casperClient] registerAgent on-chain error:`, e));
 
-      return {
-        action: "register_agent",
-        deploy_hash: `cspr-reg-${Date.now()}`,
-        result: `Agent ${agent_id} queued on-chain`,
-        timestamp: Date.now(),
-      };
+      return queuedTx;
     }
 
     return this.record("register_agent", { agent_id, role }, `Agent ${agent_id} registered`);
@@ -300,28 +298,27 @@ class WardensCoreSim {
     }
 
     if (MODE === "chain") {
+      const queuedTx: TxRecord = {
+        action: "post_bond",
+        deploy_hash: `cspr-bond-${Date.now()}`,
+        result: `Bond ${amount} queued on-chain`,
+        timestamp: Date.now(),
+      };
+      this.txs.push(queuedTx);
+
       runLivenetCmd([
         "post_bond",
         agent_id,
         amount.toString(),
       ]).then(async ({ deployHash }) => {
         const { persistTransaction } = await import("./chainSync.ts");
-        const tx: TxRecord = {
-          action: "post_bond",
-          deploy_hash: deployHash,
-          result: `Bond ${amount} locked`,
-          timestamp: Date.now(),
-        };
-        this.txs.push(tx);
-        persistTransaction(tx);
+        
+        queuedTx.deploy_hash = deployHash;
+        queuedTx.result = `Bond ${amount} locked`;
+        persistTransaction(queuedTx);
       }).catch(e => console.error(`[casperClient] postBond on-chain error:`, e));
 
-      return {
-        action: "post_bond",
-        deploy_hash: `cspr-bond-${Date.now()}`,
-        result: `Bond ${amount} queued on-chain`,
-        timestamp: Date.now(),
-      };
+      return queuedTx;
     }
 
     const a = this.mustAgent(agent_id);
