@@ -21,6 +21,25 @@ const STATE_FILE = `${ROOT}/scripts/.chain_state`;
 /** Persisted chain snapshot — lets the backend restart instantly. */
 const CACHE_DIR = `${ROOT}/backend/.local`;
 const CACHE_FILE = `${CACHE_DIR}/chain_cache.json`;
+const ASSETS_FILE = `${CACHE_DIR}/tracked_assets.json`;
+
+function getTrackedAssets(): string[] {
+  if (!existsSync(ASSETS_FILE)) return [];
+  try {
+    return JSON.parse(readFileSync(ASSETS_FILE, "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+export function trackAssetLocally(asset_id: string) {
+  if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+  const assets = getTrackedAssets();
+  if (!assets.includes(asset_id)) {
+    assets.push(asset_id);
+    writeFileSync(ASSETS_FILE, JSON.stringify(assets));
+  }
+}
 
 function formatAddress(addr: string): string {
   if (addr.startsWith("hash-")) {
@@ -140,6 +159,7 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
       if (!line) return resolve({ ok: false, error: `no chain data (exit ${code}). ${err.slice(-400)}` });
       try {
         applyChainData(JSON.parse(line.slice("DUMP ".length)) as DumpData);
+        if (assetId) trackAssetLocally(assetId);
         resolve({ ok: true });
       } catch (e) {
         resolve({ ok: false, error: `parse failed: ${(e as Error).message}` });
@@ -157,9 +177,9 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
  * reads from the node) so errors on one asset do not block the others.
  */
 export async function syncAllFromChain(): Promise<void> {
-  // Empty array to ensure zero invoices are loaded by default for live demos.
-  const ASSETS: string[] = [];
-  console.log("[chainSync] startup sync: pulling live state from Casper Testnet…");
+  // Load tracked assets from local file so they survive restarts
+  const ASSETS: string[] = getTrackedAssets();
+  console.log(`[chainSync] startup sync: pulling live state from Casper Testnet for ${ASSETS.length} assets…`);
   for (const assetId of ASSETS) {
     const result = await syncAssetFromChain(assetId);
     if (result.ok) {
