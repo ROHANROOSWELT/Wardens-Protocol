@@ -203,7 +203,7 @@ class WardensCoreSim {
     evidence_hash: string;
   }): Promise<TxRecord> {
     const now = this.now();
-    // 1. Optimistically populate in-memory read model
+    // 1. Optimistically update read model immediately
     this.assets.set(a.asset_id, {
       ...a,
       status: "Active",
@@ -216,8 +216,10 @@ class WardensCoreSim {
       const { syncAssetFromChain, trackAssetLocally, persistTransaction } = await import("./chainSync.ts");
       trackAssetLocally(a.asset_id);
 
-      // Await real livenet deploy execution directly on Casper Testnet
-      const { deployHash } = await runLivenetCmd([
+      const placeholderHash = "cspr-" + a.evidence_hash.substring(7, 39);
+
+      // Submit to Casper Testnet asynchronously in background to prevent HTTP gateway timeouts on Vercel
+      runLivenetCmd([
         "create_asset",
         a.asset_id,
         a.issuer,
@@ -225,19 +227,24 @@ class WardensCoreSim {
         a.face_value.toString(),
         a.due_date.toString(),
         a.evidence_hash,
-      ]);
+      ]).then(async ({ deployHash }) => {
+        await syncAssetFromChain(a.asset_id);
+        const tx: TxRecord = {
+          action: "create_asset",
+          deploy_hash: deployHash,
+          result: `Asset ${a.asset_id} created`,
+          timestamp: Date.now(),
+        };
+        this.txs.push(tx);
+        persistTransaction(tx);
+      }).catch(e => console.error(`[casperClient] createAsset on-chain error:`, e));
 
-      await syncAssetFromChain(a.asset_id);
-      
-      const tx: TxRecord = {
+      return {
         action: "create_asset",
-        deploy_hash: deployHash,
-        result: `Asset ${a.asset_id} created`,
+        deploy_hash: placeholderHash,
+        result: `Asset ${a.asset_id} queued on-chain`,
         timestamp: Date.now(),
       };
-      this.txs.push(tx);
-      persistTransaction(tx);
-      return tx;
     }
 
     return this.record("create_asset", a, `Asset ${a.asset_id} created`);
@@ -257,21 +264,28 @@ class WardensCoreSim {
     });
 
     if (MODE === "chain") {
-      const { deployHash } = await runLivenetCmd([
+      runLivenetCmd([
         "register_agent",
         agent_id,
         role.toLowerCase(),
-      ]);
-      const { persistTransaction } = await import("./chainSync.ts");
-      const tx: TxRecord = {
+      ]).then(async ({ deployHash }) => {
+        const { persistTransaction } = await import("./chainSync.ts");
+        const tx: TxRecord = {
+          action: "register_agent",
+          deploy_hash: deployHash,
+          result: `Agent ${agent_id} registered`,
+          timestamp: Date.now(),
+        };
+        this.txs.push(tx);
+        persistTransaction(tx);
+      }).catch(e => console.error(`[casperClient] registerAgent on-chain error:`, e));
+
+      return {
         action: "register_agent",
-        deploy_hash: deployHash,
-        result: `Agent ${agent_id} registered`,
+        deploy_hash: `cspr-reg-${Date.now()}`,
+        result: `Agent ${agent_id} queued on-chain`,
         timestamp: Date.now(),
       };
-      this.txs.push(tx);
-      persistTransaction(tx);
-      return tx;
     }
 
     return this.record("register_agent", { agent_id, role }, `Agent ${agent_id} registered`);
@@ -285,21 +299,28 @@ class WardensCoreSim {
     }
 
     if (MODE === "chain") {
-      const { deployHash } = await runLivenetCmd([
+      runLivenetCmd([
         "post_bond",
         agent_id,
         amount.toString(),
-      ]);
-      const { persistTransaction } = await import("./chainSync.ts");
-      const tx: TxRecord = {
+      ]).then(async ({ deployHash }) => {
+        const { persistTransaction } = await import("./chainSync.ts");
+        const tx: TxRecord = {
+          action: "post_bond",
+          deploy_hash: deployHash,
+          result: `Bond ${amount} locked`,
+          timestamp: Date.now(),
+        };
+        this.txs.push(tx);
+        persistTransaction(tx);
+      }).catch(e => console.error(`[casperClient] postBond on-chain error:`, e));
+
+      return {
         action: "post_bond",
-        deploy_hash: deployHash,
-        result: `Bond ${amount} locked`,
+        deploy_hash: `cspr-bond-${Date.now()}`,
+        result: `Bond ${amount} queued on-chain`,
         timestamp: Date.now(),
       };
-      this.txs.push(tx);
-      persistTransaction(tx);
-      return tx;
     }
 
     const a = this.mustAgent(agent_id);
