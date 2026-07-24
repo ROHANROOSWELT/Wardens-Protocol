@@ -59,8 +59,6 @@ module.exports = {
     { name: 'parser', script: 'bun', args: 'src/index.ts', cwd: './agents/parser-agent' },
     { name: 'fraud', script: 'bun', args: 'src/index.ts', cwd: './agents/fraud-agent' },
     { name: 'registry', script: 'bun', args: 'src/index.ts', cwd: './agents/registry-agent' },
-    { name: 'aggregator', script: 'bun', args: 'src/index.ts', cwd: './agents/aggregator-agent' },
-    { name: 'challenger', script: 'bun', args: 'src/index.ts', cwd: './agents/challenger-agent' },
     { name: 'dashboard', script: 'bun', args: 'run start', cwd: './dashboard', env: { PORT: '3000' } }
   ]
 };
