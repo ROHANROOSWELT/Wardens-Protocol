@@ -1,12 +1,20 @@
-module.exports = {
-  apps: [
-    { name: 'backend',    script: 'bun', args: 'run dev',     cwd: './backend',                autorestart: true  },
-    { name: 'parser',     script: 'bun', args: 'src/index.ts', cwd: './agents/parser-agent',    autorestart: true  },
-    { name: 'fraud',      script: 'bun', args: 'src/index.ts', cwd: './agents/fraud-agent',      autorestart: true  },
-    { name: 'registry',   script: 'bun', args: 'src/index.ts', cwd: './agents/registry-agent',   autorestart: true  },
-    // aggregator and challenger are one-shot CLI tools — run once on demand, do not loop.
-    { name: 'aggregator', script: 'bun', args: 'src/index.ts', cwd: './agents/aggregator-agent', autorestart: false },
-    { name: 'challenger', script: 'bun', args: 'src/index.ts', cwd: './agents/challenger-agent', autorestart: false },
-  ]
+const env = {
+  WARDENS_MODE: 'chain',
+  PORT: '4000',
+  WARDENS_CORE_ADDRESS: 'contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de',
+  ODRA_CASPER_LIVENET_NODE_ADDRESS: 'https://node.testnet.casper.network/rpc',
+  ODRA_CASPER_LIVENET_CHAIN_NAME: 'casper-test',
+  ODRA_CASPER_LIVENET_SECRET_KEY_PATH: '/home/azureuser/Desktop/keys/secret_key.pem',
+  ODRA_CASPER_LIVENET_EVENTS_URL: 'http://node.testnet.casper.network:9999/events/main',
 };
 
+module.exports = {
+  apps: [
+    { name: 'backend',    script: 'bun', args: 'run dev',     cwd: './backend',                autorestart: true, env },
+    { name: 'parser',     script: 'bun', args: 'src/index.ts', cwd: './agents/parser-agent',    autorestart: true, env },
+    { name: 'fraud',      script: 'bun', args: 'src/index.ts', cwd: './agents/fraud-agent',      autorestart: true, env },
+    { name: 'registry',   script: 'bun', args: 'src/index.ts', cwd: './agents/registry-agent',   autorestart: true, env },
+    { name: 'aggregator', script: 'bun', args: 'src/index.ts', cwd: './agents/aggregator-agent', autorestart: false, env },
+    { name: 'challenger', script: 'bun', args: 'src/index.ts', cwd: './agents/challenger-agent', autorestart: false, env },
+  ]
+};

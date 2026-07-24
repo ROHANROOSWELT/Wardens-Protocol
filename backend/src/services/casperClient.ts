@@ -203,7 +203,7 @@ class WardensCoreSim {
     evidence_hash: string;
   }): Promise<TxRecord> {
     const now = this.now();
-    // 1. Optimistically update read model immediately
+    // 1. Optimistically populate in-memory read model
     this.assets.set(a.asset_id, {
       ...a,
       status: "Active",
@@ -213,11 +213,11 @@ class WardensCoreSim {
     });
 
     if (MODE === "chain") {
-      // 2. Track locally so it's persisted across backend restarts
-      import("./chainSync.ts").then(({ trackAssetLocally }) => trackAssetLocally(a.asset_id));
+      const { syncAssetFromChain, trackAssetLocally, persistTransaction } = await import("./chainSync.ts");
+      trackAssetLocally(a.asset_id);
 
-      // 3. Submit to Casper Testnet asynchronously without blocking UI response
-      runLivenetCmd([
+      // Await real livenet deploy execution directly on Casper Testnet
+      const { deployHash } = await runLivenetCmd([
         "create_asset",
         a.asset_id,
         a.issuer,
@@ -225,25 +225,19 @@ class WardensCoreSim {
         a.face_value.toString(),
         a.due_date.toString(),
         a.evidence_hash,
-      ]).then(async ({ deployHash }) => {
-        const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
-        await syncAssetFromChain(a.asset_id);
-        const tx: TxRecord = {
-          action: "create_asset",
-          deploy_hash: deployHash,
-          result: `Asset ${a.asset_id} created`,
-          timestamp: Date.now(),
-        };
-        this.txs.push(tx);
-        persistTransaction(tx);
-      }).catch(e => console.error(`[casperClient] createAsset on-chain error:`, e));
+      ]);
 
-      return {
+      await syncAssetFromChain(a.asset_id);
+      
+      const tx: TxRecord = {
         action: "create_asset",
-        deploy_hash: "pending-on-chain",
-        result: `Asset ${a.asset_id} queued on-chain`,
+        deploy_hash: deployHash,
+        result: `Asset ${a.asset_id} created`,
         timestamp: Date.now(),
       };
+      this.txs.push(tx);
+      persistTransaction(tx);
+      return tx;
     }
 
     return this.record("create_asset", a, `Asset ${a.asset_id} created`);
@@ -263,28 +257,21 @@ class WardensCoreSim {
     });
 
     if (MODE === "chain") {
-      runLivenetCmd([
+      const { deployHash } = await runLivenetCmd([
         "register_agent",
         agent_id,
         role.toLowerCase(),
-      ]).then(async ({ deployHash }) => {
-        const { persistTransaction } = await import("./chainSync.ts");
-        const tx: TxRecord = {
-          action: "register_agent",
-          deploy_hash: deployHash,
-          result: `Agent ${agent_id} registered`,
-          timestamp: Date.now(),
-        };
-        this.txs.push(tx);
-        persistTransaction(tx);
-      }).catch(e => console.error(`[casperClient] registerAgent on-chain error:`, e));
-
-      return {
+      ]);
+      const { persistTransaction } = await import("./chainSync.ts");
+      const tx: TxRecord = {
         action: "register_agent",
-        deploy_hash: "pending-on-chain",
-        result: `Agent ${agent_id} queued on-chain`,
+        deploy_hash: deployHash,
+        result: `Agent ${agent_id} registered`,
         timestamp: Date.now(),
       };
+      this.txs.push(tx);
+      persistTransaction(tx);
+      return tx;
     }
 
     return this.record("register_agent", { agent_id, role }, `Agent ${agent_id} registered`);
@@ -298,28 +285,21 @@ class WardensCoreSim {
     }
 
     if (MODE === "chain") {
-      runLivenetCmd([
+      const { deployHash } = await runLivenetCmd([
         "post_bond",
         agent_id,
         amount.toString(),
-      ]).then(async ({ deployHash }) => {
-        const { persistTransaction } = await import("./chainSync.ts");
-        const tx: TxRecord = {
-          action: "post_bond",
-          deploy_hash: deployHash,
-          result: `Bond ${amount} locked`,
-          timestamp: Date.now(),
-        };
-        this.txs.push(tx);
-        persistTransaction(tx);
-      }).catch(e => console.error(`[casperClient] postBond on-chain error:`, e));
-
-      return {
+      ]);
+      const { persistTransaction } = await import("./chainSync.ts");
+      const tx: TxRecord = {
         action: "post_bond",
-        deploy_hash: "pending-on-chain",
-        result: `Bond ${amount} queued on-chain`,
+        deploy_hash: deployHash,
+        result: `Bond ${amount} locked`,
         timestamp: Date.now(),
       };
+      this.txs.push(tx);
+      persistTransaction(tx);
+      return tx;
     }
 
     const a = this.mustAgent(agent_id);
