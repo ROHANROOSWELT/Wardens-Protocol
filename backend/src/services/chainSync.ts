@@ -38,6 +38,28 @@ export function persistTransaction(tx: import("./casperClient.ts").TxRecord) {
   if (existsSync(TXS_FILE)) {
     try { txs = JSON.parse(readFileSync(TXS_FILE, "utf8")); } catch { txs = []; }
   }
+  // Upsert: update by deploy_hash if already exists (handles placeholder → real hash update)
+  const idx = txs.findIndex((t) => t.deploy_hash === tx.deploy_hash);
+  if (idx >= 0) {
+    txs[idx] = tx;
+  } else {
+    txs.push(tx);
+  }
+  writeFileSync(TXS_FILE, JSON.stringify(txs));
+}
+
+/** Replace a placeholder transaction (by oldHash) with the confirmed on-chain one. */
+export function replaceTransaction(
+  oldHash: string,
+  tx: import("./casperClient.ts").TxRecord
+) {
+  ensureCacheDir();
+  let txs: import("./casperClient.ts").TxRecord[] = [];
+  if (existsSync(TXS_FILE)) {
+    try { txs = JSON.parse(readFileSync(TXS_FILE, "utf8")); } catch { txs = []; }
+  }
+  // Remove the old placeholder entry
+  txs = txs.filter((t) => t.deploy_hash !== oldHash);
   txs.push(tx);
   writeFileSync(TXS_FILE, JSON.stringify(txs));
 }
