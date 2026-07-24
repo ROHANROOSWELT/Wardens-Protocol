@@ -16,7 +16,11 @@ import type { AssetStatus } from "./scoreEngine.ts";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url)); // repo root
 const CONTRACT_DIR = `${ROOT}/contracts/wardens_core`;
-const BIN = `${CONTRACT_DIR}/target/debug/wardens_livenet`;
+const RELEASE_BIN = `${CONTRACT_DIR}/target/release/wardens_livenet`;
+const DEBUG_BIN = `${CONTRACT_DIR}/target/debug/wardens_livenet`;
+function getLivenetBin(): string {
+  return existsSync(RELEASE_BIN) ? RELEASE_BIN : DEBUG_BIN;
+}
 const STATE_FILE = `${ROOT}/scripts/.chain_state`;
 /** Persisted chain snapshot — lets the backend restart instantly. */
 const CACHE_DIR = `${ROOT}/backend/.local`;
@@ -160,22 +164,36 @@ function applyChainData(d: DumpData): void {
   }
 }
 
+function resolveSecretKeyPath(): string {
+  const candidates = [
+    process.env.ODRA_CASPER_LIVENET_SECRET_KEY_PATH,
+    process.env.BACKEND_PRIVATE_KEY_PATH,
+    "/home/azureuser/Desktop/keys/secret_key.pem",
+    "/home/rohan/Desktop/keys/secret_key.pem",
+  ];
+  for (const c of candidates) {
+    if (c && existsSync(c)) return c;
+  }
+  return "/home/azureuser/Desktop/keys/secret_key.pem";
+}
+
 /** Read one asset's live on-chain state (+ demo agents/challenges) into the model. */
 export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; error?: string }> {
   const addr = contractAddress();
   if (!addr) return Promise.resolve({ ok: false, error: "WARDENS_CORE_ADDRESS not set — deploy first (scripts/deploy_chain.sh)" });
-  if (!existsSync(BIN)) return Promise.resolve({ ok: false, error: `livenet executor not built at ${BIN} — run: cargo build --features livenet --bin wardens_livenet` });
+  const bin = getLivenetBin();
+  if (!existsSync(bin)) return Promise.resolve({ ok: false, error: `livenet executor not built at ${bin} — run: cargo build --features livenet --bin wardens_livenet` });
 
   return new Promise((resolve) => {
     const envs = {
       ...process.env,
       WARDENS_CORE_ADDRESS: addr,
-      ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "",
-      ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "",
-      ODRA_CASPER_LIVENET_SECRET_KEY_PATH: process.env.ODRA_CASPER_LIVENET_SECRET_KEY_PATH || process.env.BACKEND_PRIVATE_KEY_PATH || "",
-      ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "",
+      ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "https://node.testnet.casper.network/rpc",
+      ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "casper-test",
+      ODRA_CASPER_LIVENET_SECRET_KEY_PATH: resolveSecretKeyPath(),
+      ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "http://node.testnet.casper.network:9999/events/main",
     };
-    const child = spawn(BIN, ["dump", assetId], {
+    const child = spawn(bin, ["dump", assetId], {
       cwd: CONTRACT_DIR,
       env: envs,
     });

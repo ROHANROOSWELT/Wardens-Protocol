@@ -101,16 +101,29 @@ function formatAddress(addr: string): string {
   return addr;
 }
 
+function resolveSecretKeyPath(): string {
+  const candidates = [
+    process.env.ODRA_CASPER_LIVENET_SECRET_KEY_PATH,
+    process.env.BACKEND_PRIVATE_KEY_PATH,
+    "/home/azureuser/Desktop/keys/secret_key.pem",
+    "/home/rohan/Desktop/keys/secret_key.pem",
+  ];
+  for (const c of candidates) {
+    if (c && existsSync(c)) return c;
+  }
+  return "/home/azureuser/Desktop/keys/secret_key.pem";
+}
+
 function getLivenetEnv() {
   const addr = process.env.WARDENS_CORE_ADDRESS || process.env.WARDENS_CORE_HASH || "";
   const formattedAddr = formatAddress(addr);
   return {
     ...process.env,
     WARDENS_CORE_ADDRESS: formattedAddr,
-    ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "",
-    ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "",
-    ODRA_CASPER_LIVENET_SECRET_KEY_PATH: process.env.ODRA_CASPER_LIVENET_SECRET_KEY_PATH || process.env.BACKEND_PRIVATE_KEY_PATH || "",
-    ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "",
+    ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "https://node.testnet.casper.network/rpc",
+    ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "casper-test",
+    ODRA_CASPER_LIVENET_SECRET_KEY_PATH: resolveSecretKeyPath(),
+    ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "http://node.testnet.casper.network:9999/events/main",
   };
 }
 
@@ -189,33 +202,8 @@ class WardensCoreSim {
     due_date: number;
     evidence_hash: string;
   }): Promise<TxRecord> {
-    if (MODE === "chain") {
-      const { deployHash } = await runLivenetCmd([
-        "create_asset",
-        a.asset_id,
-        a.issuer,
-        a.debtor,
-        a.face_value.toString(),
-        a.due_date.toString(),
-        a.evidence_hash,
-      ]);
-      const { syncAssetFromChain } = await import("./chainSync.ts");
-      await syncAssetFromChain(a.asset_id);
-      
-      const tx: TxRecord = {
-        action: "create_asset",
-        deploy_hash: deployHash,
-        result: `Asset ${a.asset_id} created`,
-        timestamp: Date.now(),
-      };
-      this.txs.push(tx);
-      const { persistTransaction } = await import("./chainSync.ts");
-      persistTransaction(tx);
-      return tx;
-    }
-
-    if (this.assets.has(a.asset_id)) throw new Error("AssetAlreadyExists");
     const now = this.now();
+    // 1. Optimistically update read model immediately
     this.assets.set(a.asset_id, {
       ...a,
       status: "Active",
@@ -223,32 +211,45 @@ class WardensCoreSim {
       created_at: now,
       updated_at: now,
     });
+
+    if (MODE === "chain") {
+      // 2. Track locally so it's persisted across backend restarts
+      import("./chainSync.ts").then(({ trackAssetLocally }) => trackAssetLocally(a.asset_id));
+
+      // 3. Submit to Casper Testnet asynchronously without blocking UI response
+      runLivenetCmd([
+        "create_asset",
+        a.asset_id,
+        a.issuer,
+        a.debtor,
+        a.face_value.toString(),
+        a.due_date.toString(),
+        a.evidence_hash,
+      ]).then(async ({ deployHash }) => {
+        const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
+        await syncAssetFromChain(a.asset_id);
+        const tx: TxRecord = {
+          action: "create_asset",
+          deploy_hash: deployHash,
+          result: `Asset ${a.asset_id} created`,
+          timestamp: Date.now(),
+        };
+        this.txs.push(tx);
+        persistTransaction(tx);
+      }).catch(e => console.error(`[casperClient] createAsset on-chain error:`, e));
+
+      return {
+        action: "create_asset",
+        deploy_hash: "pending-on-chain",
+        result: `Asset ${a.asset_id} queued on-chain`,
+        timestamp: Date.now(),
+      };
+    }
+
     return this.record("create_asset", a, `Asset ${a.asset_id} created`);
   }
 
   async registerAgent(agent_id: string, role: string): Promise<TxRecord> {
-    if (MODE === "chain") {
-      const { deployHash } = await runLivenetCmd([
-        "register_agent",
-        agent_id,
-        role.toLowerCase(),
-      ]);
-      const { syncAssetFromChain } = await import("./chainSync.ts");
-      await syncAssetFromChain("");
-      
-      const tx: TxRecord = {
-        action: "register_agent",
-        deploy_hash: deployHash,
-        result: `Agent ${agent_id} registered`,
-        timestamp: Date.now(),
-      };
-      this.txs.push(tx);
-      const { persistTransaction } = await import("./chainSync.ts");
-      persistTransaction(tx);
-      return tx;
-    }
-
-    if (this.agents.has(agent_id)) throw new Error("AgentAlreadyRegistered");
     this.agents.set(agent_id, {
       agent_id,
       role,
@@ -258,36 +259,72 @@ class WardensCoreSim {
       successful_reports: 0,
       slashed_count: 0,
       active: true,
-      x402_price: 1_000_000, // default base price; caller can override via marketplace/register
+      x402_price: 1_000_000,
     });
+
+    if (MODE === "chain") {
+      runLivenetCmd([
+        "register_agent",
+        agent_id,
+        role.toLowerCase(),
+      ]).then(async ({ deployHash }) => {
+        const { persistTransaction } = await import("./chainSync.ts");
+        const tx: TxRecord = {
+          action: "register_agent",
+          deploy_hash: deployHash,
+          result: `Agent ${agent_id} registered`,
+          timestamp: Date.now(),
+        };
+        this.txs.push(tx);
+        persistTransaction(tx);
+      }).catch(e => console.error(`[casperClient] registerAgent on-chain error:`, e));
+
+      return {
+        action: "register_agent",
+        deploy_hash: "pending-on-chain",
+        result: `Agent ${agent_id} queued on-chain`,
+        timestamp: Date.now(),
+      };
+    }
+
     return this.record("register_agent", { agent_id, role }, `Agent ${agent_id} registered`);
   }
 
   async postBond(agent_id: string, amount: number): Promise<TxRecord> {
+    const agent = this.agents.get(agent_id);
+    if (agent) {
+      agent.bonded_amount += amount;
+      agent.active = true;
+    }
+
     if (MODE === "chain") {
-      const { deployHash } = await runLivenetCmd([
+      runLivenetCmd([
         "post_bond",
         agent_id,
         amount.toString(),
-      ]);
-      const { syncAssetFromChain } = await import("./chainSync.ts");
-      await syncAssetFromChain("");
-      
-      const tx: TxRecord = {
+      ]).then(async ({ deployHash }) => {
+        const { persistTransaction } = await import("./chainSync.ts");
+        const tx: TxRecord = {
+          action: "post_bond",
+          deploy_hash: deployHash,
+          result: `Bond ${amount} locked`,
+          timestamp: Date.now(),
+        };
+        this.txs.push(tx);
+        persistTransaction(tx);
+      }).catch(e => console.error(`[casperClient] postBond on-chain error:`, e));
+
+      return {
         action: "post_bond",
-        deploy_hash: deployHash,
-        result: `Bond ${amount} locked`,
+        deploy_hash: "pending-on-chain",
+        result: `Bond ${amount} queued on-chain`,
         timestamp: Date.now(),
       };
-      this.txs.push(tx);
-      const { persistTransaction } = await import("./chainSync.ts");
-      persistTransaction(tx);
-      return tx;
     }
 
-    const agent = this.mustAgent(agent_id);
-    agent.bonded_amount += amount;
-    agent.active = true;
+    const a = this.mustAgent(agent_id);
+    a.bonded_amount += amount;
+    a.active = true;
     return this.record("post_bond", { agent_id, amount }, `Bond ${amount} locked`);
   }
 

@@ -37,6 +37,12 @@ assetsRouter.post("/", async (req, res) => {
     }
 
     const evidence_hash = canonicalizeAndHash({ asset_id, issuer, debtor, face_value, due_date });
+    // Store the off-chain file / details
+    offchainData.set(asset_id, {
+      invoice_number: invoice_number || asset_id,
+      invoice_file_content: invoice_file_content || "{}"
+    });
+
     const tx = await casper.createAsset({
       asset_id,
       issuer,
@@ -44,12 +50,6 @@ assetsRouter.post("/", async (req, res) => {
       face_value,
       due_date,
       evidence_hash,
-    });
-    
-    // Store the off-chain mock file / details
-    offchainData.set(asset_id, {
-      invoice_number: invoice_number || asset_id,
-      invoice_file_content: invoice_file_content || "{}"
     });
 
     res.json({ deploy_hash: tx.deploy_hash, evidence_hash, asset_id });

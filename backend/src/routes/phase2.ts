@@ -18,21 +18,40 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
-const BIN = `${ROOT}/contracts/wardens_phase2/target/debug/wardens_phase2_livenet`;
+
+function getPhase2Bin(): string {
+  const rel = `${ROOT}/contracts/wardens_phase2/target/release/wardens_phase2_livenet`;
+  const dbg = `${ROOT}/contracts/wardens_phase2/target/debug/wardens_phase2_livenet`;
+  return existsSync(rel) ? rel : dbg;
+}
+
+function resolveSecretKeyPath(): string {
+  const candidates = [
+    process.env.ODRA_CASPER_LIVENET_SECRET_KEY_PATH,
+    process.env.BACKEND_PRIVATE_KEY_PATH,
+    "/home/azureuser/Desktop/keys/secret_key.pem",
+    "/home/rohan/Desktop/keys/secret_key.pem",
+  ];
+  for (const c of candidates) {
+    if (c && existsSync(c)) return c;
+  }
+  return "/home/azureuser/Desktop/keys/secret_key.pem";
+}
 
 function getLivenetEnv() {
   return {
     ...process.env,
-    ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "",
-    ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "",
-    ODRA_CASPER_LIVENET_SECRET_KEY_PATH: process.env.ODRA_CASPER_LIVENET_SECRET_KEY_PATH || process.env.BACKEND_PRIVATE_KEY_PATH || "",
-    ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "",
+    ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "https://node.testnet.casper.network/rpc",
+    ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "casper-test",
+    ODRA_CASPER_LIVENET_SECRET_KEY_PATH: resolveSecretKeyPath(),
+    ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "http://node.testnet.casper.network:9999/events/main",
   };
 }
 
 function runPhase2LivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string; deployHash: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn(BIN, args, {
+    const bin = getPhase2Bin();
+    const child = spawn(bin, args, {
       cwd: `${ROOT}/contracts/wardens_phase2`,
       env: getLivenetEnv(),
     });
