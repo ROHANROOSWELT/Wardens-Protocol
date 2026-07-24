@@ -91,6 +91,128 @@ Casper's upgradeable contract packages, the Odra framework, and native contract 
 
 ---
 
+## 🎬 Full Video Demo Walkthrough
+
+> 🎥 **[Watch the full demo on YouTube](https://www.youtube.com/watch?v=XzGEAL43tB4)**
+
+This walkthrough maps every moment of the demo video to the actual system behaviour, so judges can verify each claim independently.
+
+---
+
+### Scene 1 — Registering Legitimate Collateral
+
+**Action:** Register invoice worth **1,000 CSPR** · Issuer: `ABC Corporation` · Debtor: `XYZ Limited`
+
+**What happens under the hood:**
+- Frontend calls `POST /api/assets`
+- Backend spawns the Odra livenet executor and submits `WardensCore.create_asset` to Casper Testnet
+- A real transaction hash is returned and shown in the Proof Ledger
+
+**Expected outcome:**
+- ✅ Asset appears in Vault Registry
+- ✅ Trust Score = **0** (unverified — borrowing intentionally disabled)
+- ✅ Transaction visible on [testnet.cspr.live](https://testnet.cspr.live)
+
+---
+
+### Scene 2 — Multi-Agent Verification with x402
+
+**Action:** Click **Verify** on the asset
+
+**What happens under the hood:**
+```
+Backend → POST /verify/parser   ← 402 Payment Required
+Backend pays CSPR micropayment, retries → 200 OK { score: 92 }
+
+Backend → POST /verify/fraud    ← 402 Payment Required
+Backend pays CSPR micropayment, retries → 200 OK { score: 95, "No duplicates found" }
+
+Backend → POST /verify/registry ← 402 Payment Required
+Backend pays CSPR micropayment, retries → 200 OK { score: 94 }
+
+Aggregator drops outliers → Final Score = 94
+Aggregator calls WardensCore.submit_score → Casper deploy
+```
+
+**Expected outcome:**
+- ✅ Trust Score = **94 / 100**
+- ✅ LTV automatically updates to **75%** via CovenantEngine
+- ✅ Borrowing status changes from DISABLED → **ENABLED**
+- ✅ Second on-chain transaction recorded in Proof Ledger
+
+---
+
+### Scene 3 — Borrowing Against Verified Collateral
+
+**Action:** Borrow **700 CSPR** against the verified asset
+
+**What happens under the hood:**
+- CovenantEngine checks: score ≥ 85 → `FullAccess` state
+- LendingVault checks: 700 ≤ (1000 × 75%) = 750 → within LTV limit
+- `WardensCore.borrow` transaction submitted on-chain
+
+**Expected outcome:**
+- ✅ Borrow succeeds immediately
+- ✅ Third on-chain transaction visible
+
+---
+
+### Scene 4 — Fraud Detection (Duplicate Collateral)
+
+**Action:** Register a **second invoice** with identical issuer, debtor, and face value
+
+**What happens under the hood:**
+- `POST /api/assets` → second Casper deploy (creates the duplicate asset)
+- Verification triggered → Fraud Agent calls `GET /api/assets`
+- Fraud Agent finds **matching issuer + debtor + face_value** on another asset_id
+- Returns: `{ score: 0, valid: false, findings: ["Duplicate invoice collateral found on-chain"] }`
+- Aggregator computes final score: **46** (fraud weight dominates)
+- Score submitted on-chain → CovenantEngine evaluates: score < 50 → `BreachMode`
+
+**Expected outcome:**
+- ✅ Trust Score = **46 / 100**
+- ✅ Asset status → **Frozen** automatically by smart contract
+- ✅ LTV drops to **0%**
+- ✅ Borrowing → **BLOCKED** with no admin intervention
+
+---
+
+### Scene 5 — Challenge & Bond Slashing
+
+**Action:** Open a challenge on a fraudulent score → vote to uphold it
+
+**What happens under the hood:**
+- Challenger Agent detects high score with suspicious flags
+- Posts **counter-bond** to `ChallengeCourt.open_challenge` → Casper deploy
+- Arbitrators call `ChallengeCourt.cast_vote` (quorum = 2 votes)
+- On resolution: `BondVault` slashes the malicious verifier's full stake
+- Challenger's reputation increases on-chain
+- `ScoreRegistry` marks the fraudulent score as challenged
+
+**Expected outcome:**
+- ✅ Verifier bond slashed to **0 CSPR**
+- ✅ Challenger bond increases (slash reward)
+- ✅ Verifier reputation decremented permanently on-chain
+- ✅ Asset permanently marked as disputed
+
+---
+
+### Complete On-Chain Transaction Trail
+
+Every action above produces a real, verifiable Casper transaction:
+
+| Action | Casper Explorer |
+|:---|:---|
+| `create_asset` (legitimate) | [`7a0e77e4...`](https://testnet.cspr.live/transaction/7a0e77e46efa55c94da5aeb3d293e62834d6c5494892ff0104a3ba5e274cf2e3) |
+| `create_asset` (duplicate) | [`fa37c004...`](https://testnet.cspr.live/transaction/fa37c004346a58fb3d6d46356f9b4419ee0d2bd7bf32967b4dad817dbbc867d0) |
+| `create_asset` (third asset) | [`161e71e4...`](https://testnet.cspr.live/transaction/161e71e446aa7d525716701f3cdd63339b06ec865baee3e0b9ea597896b5ee47) |
+
+> The backend runs in `WARDENS_MODE=chain` — **zero simulation, zero mocking.**
+
+---
+
+
+
 ## 🏛️ System Architecture
 
 ```mermaid
