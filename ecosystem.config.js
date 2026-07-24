@@ -4,7 +4,7 @@ const sharedEnv = {
   ODRA_CASPER_LIVENET_NODE_ADDRESS: 'https://node.testnet.casper.network/rpc',
   ODRA_CASPER_LIVENET_CHAIN_NAME: 'casper-test',
   ODRA_CASPER_LIVENET_SECRET_KEY_PATH: '/home/azureuser/Desktop/keys/secret_key.pem',
-  ODRA_CASPER_LIVENET_EVENTS_URL: 'https://node.testnet.casper.network/events/main',
+  ODRA_CASPER_LIVENET_EVENTS_URL: 'http://135.181.17.229:9999/events',
 };
 
 module.exports = {
