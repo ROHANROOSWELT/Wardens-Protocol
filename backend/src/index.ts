@@ -33,6 +33,9 @@ app.use("/api/vault", vaultRouter);
 // Phase 2 — CovenantEngine, ReserveVault, PrivacyStore, Marketplace, Insurance, Arbitration
 app.use("/api/p2", phase2Router);
 
+const syncInFlight = new Set<string>();
+const lastSync = new Map<string, number>();
+
 // GET /api/dashboard/:asset_id — full state for the one-page dashboard.
 // In chain mode: syncs this asset from the real contract first so every field
 // reflects the actual on-chain value at the time of the request.
@@ -41,7 +44,15 @@ app.get("/api/dashboard/:asset_id", async (req, res) => {
 
   if ((process.env.WARDENS_MODE ?? "sim") === "chain") {
     // Best-effort live sync — don't fail the request if the node is slow.
-    await syncAssetFromChain(asset_id).catch(() => {});
+    const now = Date.now();
+    const last = lastSync.get(asset_id) || 0;
+    if (!syncInFlight.has(asset_id) && now - last > 60000) {
+      syncInFlight.add(asset_id);
+      syncAssetFromChain(asset_id).finally(() => {
+        syncInFlight.delete(asset_id);
+        lastSync.set(asset_id, Date.now());
+      });
+    }
   }
 
   const asset = casper.assets.get(asset_id);
