@@ -1,9 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { post, getChainInfo, explorerLink, BACKEND } from "../../lib/api";
-
-
+import { post, getChainInfo, explorerLink, BACKEND, getAssets } from "../../lib/api";
 async function getJson<T>(path: string, fb: T): Promise<T> {
   try {
     const r = await fetch(`${BACKEND}${path}`, { cache: "no-store" });
@@ -35,6 +33,7 @@ export default function Phase2Dashboard() {
   const [dynamicAssets, setDynamicAssets] = useState<string[]>([]);
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [debugError, setDebugError] = useState<string>("");
 
   const note = (m: string) => setLog((l) => [m, ...l].slice(0, 12));
 
@@ -45,10 +44,11 @@ export default function Phase2Dashboard() {
       getJson<Tranche[]>(`/api/p2/reserve/tranches/${asset}`, []),
       getJson<Commitment[]>(`/api/p2/privacy/commitments/${asset}`, []),
       getJson<any[]>("/api/p2/marketplace/prices", []),
-      getJson<any[]>("/api/assets", []),
+      getAssets(),
     ]);
     setChain(c); setCovenant(cov); setTranches(tr); setCommitments(cm); setPrices(pr);
     
+    setDebugError(`Fetched ${aList.length} assets. Cov is ${cov ? 'ok' : 'null'}.`);
     // update dynamic asset list 
     const fetchedIds = aList.map((a: any) => a.asset_id);
     setDynamicAssets(fetchedIds);
@@ -140,6 +140,7 @@ export default function Phase2Dashboard() {
           <p className="text-body-lg text-on-surface-variant mt-xs border-l-[4px] border-secondary pl-sm">
             CovenantEngine · ReserveVault · PrivacyCommitmentStore · Marketplace · Insurance
           </p>
+          {debugError && <p className="text-error font-bold mt-sm">{debugError}</p>}
         </div>
         <div className="flex gap-sm items-center">
           {chain.mode === "chain" && (
