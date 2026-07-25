@@ -56,40 +56,17 @@ export default function VaultRegistry() {
     try {
       const assetId = `INV-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}`;
       const res = await post("/api/assets", { asset_id: assetId, issuer, debtor, faceValue: fv, dueDate, invoice_number: invoiceNumber, invoice_file_content: invoiceFile });
-      let successData: any = res.data;
-      const isTimeout = !res.ok && (!res.data?.error || res.data?.error?.includes("Gateway") || res.data?.error?.includes("Timeout") || res.data?.error?.includes("504") || res.data?.error?.includes("502"));
-      const isProcessing = res.ok && res.data?.status === "processing";
-
-      if (isTimeout || isProcessing) {
-        setStatusText("Awaiting Casper block confirmation (~2 mins)...");
-        let found = false;
-        for (let attempt = 0; attempt < 180; attempt++) {
-          await new Promise((r) => setTimeout(r, 3000));
-          const currentAssets = await getAssets();
-          const confirmedAsset = currentAssets.find((a: any) => a.asset_id === assetId);
-          if (confirmedAsset) {
-            found = true;
-            const txs = await getTransactions();
-            const latestTx = txs.slice().reverse().find((t: any) => t.action?.includes(assetId) || t.result?.includes(assetId) || t.action === "CreateAsset");
-            successData = { asset_id: assetId, deploy_hash: latestTx?.deploy_hash || confirmedAsset.evidence_hash };
-            break;
-          }
-        }
-        if (!found) {
-          setFormError(res.data?.error || "Failed to confirm asset on-chain.");
-          return;
-        }
-      } else if (!res.ok) {
+      
+      if (!res.ok) {
         setFormError(res.data?.error || "Failed to create asset.");
         return;
       }
 
       setShowForm(false);
       setFormData({ issuer: "", debtor: "", faceValue: "", dueDate: "", invoiceNumber: "", invoiceFile: "" });
-      const [a, t, g] = await Promise.all([getAssets(), getTransactions(), getAgents()]);
-      setAssets(a); setTxs(t); setAgents(g);
-      const hash = successData?.deploy_hash || (t && t[t.length - 1]?.deploy_hash) || "";
-      setSuccessMsg({ id: successData?.asset_id || assetId, hash: hash, pending: false });
+      
+      const isProcessing = res.data?.status === "processing";
+      setSuccessMsg({ id: assetId, hash: res.data?.deploy_hash || "", pending: isProcessing });
     } catch (err: any) {
       setFormError(err.message);
     } finally {
