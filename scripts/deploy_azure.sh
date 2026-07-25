@@ -62,7 +62,7 @@ module.exports = {
     { name: 'parser',   script: BUN, args: 'src/index.ts', cwd: './agents/parser-agent',  env: ENV },
     { name: 'fraud',    script: BUN, args: 'src/index.ts', cwd: './agents/fraud-agent',   env: ENV },
     { name: 'registry', script: BUN, args: 'src/index.ts', cwd: './agents/registry-agent',env: ENV },
-    { name: 'dashboard',script: BUN, args: 'run start',    cwd: './dashboard',            env: { ...ENV, PORT: '3000' } },
+    { name: 'dashboard',script: BUN, args: './node_modules/next/dist/bin/next start -p 3000', cwd: './dashboard', env: { ...ENV, PORT: '3000' } },
   ]
 };
 PM2EOF
