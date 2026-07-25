@@ -67,8 +67,8 @@ module.exports = {
 };
 PM2EOF
 
-  echo "--> Resetting transaction cache to purge all legacy mocked/queued data..."
-  rm -f ~/wardens/backend/.local/transactions.json 2>/dev/null || true
+  echo "--> Resetting all local storage (tracked assets, transactions, and cache) to start clean..."
+  rm -rf ~/wardens/backend/.local/* 2>/dev/null || true
 
   echo "--> Launching entire ecosystem in the background!"
   pm2 delete all 2>/dev/null || true
