@@ -43,16 +43,16 @@ assetsRouter.post("/", async (req, res) => {
       invoice_file_content: invoice_file_content || "{}"
     });
 
-    const tx = await casper.createAsset({
+    casper.createAsset({
       asset_id,
       issuer,
       debtor,
       face_value,
       due_date,
       evidence_hash,
-    });
+    }).catch(e => console.error(`[assets] async createAsset error for ${asset_id}:`, e));
 
-    res.json({ deploy_hash: tx.deploy_hash, evidence_hash, asset_id });
+    res.json({ status: "processing", evidence_hash, asset_id });
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });
   }

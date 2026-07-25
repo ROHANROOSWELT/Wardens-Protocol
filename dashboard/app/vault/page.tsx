@@ -57,31 +57,33 @@ export default function VaultRegistry() {
       const assetId = `INV-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}`;
       const res = await post("/api/assets", { asset_id: assetId, issuer, debtor, faceValue: fv, dueDate, invoice_number: invoiceNumber, invoice_file_content: invoiceFile });
       let successData: any = res.data;
-      if (!res.ok) {
-        // If Vercel serverless proxy times out (502/504) during synchronous block finality,
-        // automatically poll the blockchain via getAssets() until confirmation completes.
-        const isTimeout = !res.data?.error || res.data?.error?.includes("Gateway") || res.data?.error?.includes("Timeout") || res.data?.error?.includes("504") || res.data?.error?.includes("502");
+      const isTimeout = !res.ok && (!res.data?.error || res.data?.error?.includes("Gateway") || res.data?.error?.includes("Timeout") || res.data?.error?.includes("504") || res.data?.error?.includes("502"));
+      const isProcessing = res.ok && res.data?.status === "processing";
+
+      if (isTimeout || isProcessing) {
+        setStatusText("Awaiting Casper block confirmation (~2 mins)...");
         let found = false;
-        if (isTimeout || res.ok === false) {
-          setStatusText("Awaiting Casper block confirmation (~2 mins)...");
-          for (let attempt = 0; attempt < 180; attempt++) {
-            await new Promise((r) => setTimeout(r, 3000));
-            const currentAssets = await getAssets();
-            const confirmedAsset = currentAssets.find((a: any) => a.asset_id === assetId);
-            if (confirmedAsset) {
-              found = true;
-              const txs = await getTransactions();
-              const latestTx = txs.slice().reverse().find((t: any) => t.action?.includes(assetId) || t.result?.includes(assetId) || t.action === "CreateAsset");
-              successData = { asset_id: assetId, deploy_hash: latestTx?.deploy_hash || confirmedAsset.evidence_hash };
-              break;
-            }
+        for (let attempt = 0; attempt < 180; attempt++) {
+          await new Promise((r) => setTimeout(r, 3000));
+          const currentAssets = await getAssets();
+          const confirmedAsset = currentAssets.find((a: any) => a.asset_id === assetId);
+          if (confirmedAsset) {
+            found = true;
+            const txs = await getTransactions();
+            const latestTx = txs.slice().reverse().find((t: any) => t.action?.includes(assetId) || t.result?.includes(assetId) || t.action === "CreateAsset");
+            successData = { asset_id: assetId, deploy_hash: latestTx?.deploy_hash || confirmedAsset.evidence_hash };
+            break;
           }
         }
         if (!found) {
-          setFormError(res.data?.error || "Failed to create asset.");
+          setFormError(res.data?.error || "Failed to confirm asset on-chain.");
           return;
         }
+      } else if (!res.ok) {
+        setFormError(res.data?.error || "Failed to create asset.");
+        return;
       }
+
       setShowForm(false);
       setFormData({ issuer: "", debtor: "", faceValue: "", dueDate: "", invoiceNumber: "", invoiceFile: "" });
       const [a, t, g] = await Promise.all([getAssets(), getTransactions(), getAgents()]);
