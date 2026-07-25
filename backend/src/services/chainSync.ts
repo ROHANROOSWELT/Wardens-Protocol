@@ -233,18 +233,38 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
     });
     let out = "";
     let err = "";
-    child.stdout.on("data", (d) => (out += d));
-    child.stderr.on("data", (d) => (err += d));
-    child.on("error", (e) => resolve({ ok: false, error: e.message }));
-    child.on("close", (code) => {
+    let resolved = false;
+    const finish = (res: { ok: boolean; error?: string }) => {
+      if (resolved) return;
+      resolved = true;
+      try { child.kill("SIGTERM"); } catch {}
+      resolve(res);
+    };
+
+    const checkDump = () => {
       const line = out.split("\n").find((l) => l.startsWith("DUMP "));
-      if (!line) return resolve({ ok: false, error: `no chain data (exit ${code}). ${err.slice(-400)}` });
+      if (line && line.trim().endsWith("}")) {
+        try {
+          applyChainData(JSON.parse(line.slice("DUMP ".length)) as DumpData);
+          if (assetId) trackAssetLocally(assetId);
+          finish({ ok: true });
+        } catch {}
+      }
+    };
+
+    child.stdout.on("data", (d) => { out += d; checkDump(); });
+    child.stderr.on("data", (d) => { err += d; });
+    child.on("error", (e) => finish({ ok: false, error: e.message }));
+    child.on("close", (code) => {
+      if (resolved) return;
+      const line = out.split("\n").find((l) => l.startsWith("DUMP "));
+      if (!line) return finish({ ok: false, error: `no chain data (exit ${code}). ${err.slice(-400)}` });
       try {
         applyChainData(JSON.parse(line.slice("DUMP ".length)) as DumpData);
         if (assetId) trackAssetLocally(assetId);
-        resolve({ ok: true });
+        finish({ ok: true });
       } catch (e) {
-        resolve({ ok: false, error: `parse failed: ${(e as Error).message}` });
+        finish({ ok: false, error: `parse failed: ${(e as Error).message}` });
       }
     });
   });

@@ -146,26 +146,50 @@ function runLivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string
     const child = spawn(BIN, args, { cwd: CONTRACT_DIR, env: envs });
     let stdout = "";
     let stderr = "";
-    child.stdout.on("data", (d) => (stdout += d));
-    child.stderr.on("data", (d) => (stderr += d));
-    child.on("error", (e) => reject(e));
+    let resolved = false;
+
+    const finish = (err: Error | null, deployHash?: string) => {
+      if (resolved) return;
+      resolved = true;
+      try { child.kill("SIGTERM"); } catch {}
+      if (err) return reject(err);
+      resolve({ stdout, stderr, deployHash: deployHash! });
+    };
+
+    const checkStream = () => {
+      const combined = stdout + "\n" + stderr;
+      const match =
+        combined.match(/(?:deploy|transaction)\/([a-fA-F0-9]{64})/i) ||
+        combined.match(/(?:deploy|transaction) hash:?\s*([a-fA-F0-9]{64})/i) ||
+        combined.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i) ||
+        combined.match(/Transaction "([a-fA-F0-9]{64})" successfully executed/i);
+      if (match) {
+        finish(null, match[1]);
+      }
+    };
+
+    child.stdout.on("data", (d) => { stdout += d; checkStream(); });
+    child.stderr.on("data", (d) => { stderr += d; checkStream(); });
+    child.on("error", (e) => finish(e));
     child.on("close", (code) => {
-      if (code !== 0) {
-        return reject(new Error(`Command failed (exit ${code}): ${stderr || stdout}`));
+      if (resolved) return;
+      if (code !== 0 && code !== null) {
+        return finish(new Error(`Command failed (exit ${code}): ${stderr || stdout}`));
       }
       const combined = stdout + "\n" + stderr;
       const match =
         combined.match(/(?:deploy|transaction)\/([a-fA-F0-9]{64})/i) ||
         combined.match(/(?:deploy|transaction) hash:?\s*([a-fA-F0-9]{64})/i) ||
-        combined.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i);
+        combined.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i) ||
+        combined.match(/Transaction "([a-fA-F0-9]{64})" successfully executed/i);
       // Reject if no real on-chain deploy hash found — never fabricate a fake hash.
       if (!match) {
-        return reject(new Error(
+        return finish(new Error(
           `No deploy hash found in CLI output — the transaction may not have been submitted.\n` +
           `Raw output (last 600 chars): ${combined.slice(-600)}`
         ));
       }
-      resolve({ stdout, stderr, deployHash: match[1] });
+      finish(null, match[1]);
     });
   });
 }
