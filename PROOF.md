@@ -81,27 +81,25 @@ Deployed and executed on `casper-test` (Casper 2.0) via the Odra livenet executo
 below is a real transaction — verify on the explorer:
 `https://testnet.cspr.live/transaction/<hash>`.
 
-- **Contract package:** `contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de`
+- **Contract package:** `contract-package-b93d38aa5cacb4b9ecae17ebb7364b906abba449bda9396775e2f674a1fa3c2f`
 - **Admin (deployer) account:** `entity-account-b569d04d8d3e99c7fc44679d0ae3d7a430a7b13282c04cdc4c1db885d6e38fd9`
-- **Deploy WardensCore:** `89ee2b761ad1a82fbaa70558e4eb6e03dba5ae3e51aba5acade8456380a41082`
 
 | Action | Transaction hash | Result |
 | ------ | ---------------- | ------ |
-| Deploy WardensCore        | `89ee2b761ad1a82fbaa70558e4eb6e03dba5ae3e51aba5acade8456380a41082` | Contract installed |
-| create_asset INV-001      | `92a7e961f6c6574c49101fda09c44a806f112b66f76fe207660f2505a716d463` | Asset created |
-| create_asset INV-002-DUP  | `6054a078377a92f5fae4162319742d9b96c4ec71db7085fbdd1e9151852c6360` | Asset created |
-| create_asset INV-003      | `b345ad3cbc0fe7a4bc93e11f356c8f083e2fd597e27f15f705655fce21e89f44` | Asset created |
-| register_agent aggregator | `3d738485db86736c4b2c31f2109ef4782b7a034a218cb9ea740328574dac3ea3` | Agent registered |
-| register_agent challenger | `0dea2958d32ccc24143dbb67db40f3daf656b721724c07d20fa94408250181b3` | Agent registered |
-| post_bond aggregator (10) | `76ea896f7881db97c527e71c6b33bb0b5bfd8d53b0bc7d8e88a4e5eb3e96ba8c` | Bond locked |
-| post_bond challenger (10) | `f4fa5a9f64c4dfb55e5a969a21efc000ec0500f6e2799017a1f8ae18befcac5c` | Bond locked |
-| submit_score INV-001 (94) | `c5b269f22bf8e8f8c0467aa84daeb6bfbc9ed8ff2ad8ef2e99dff38c912a7038` | Healthy, LTV 75% |
-| deposit_collateral INV-001| `fe9d5dfcc2a288a46091a340ed9a3990a3f235ebae104dc90708a890a0ad0ce2` | Collateral 1000 |
-| borrow INV-001 (700)      | `ce7d6499f531eb08671f1d76641a1768d64dcb5c1aa68d34273a5af2a1f02308` | Borrow allowed |
-| submit_score INV-002 (46) | `503620b136d3d6b234f634573fe1302f28a93b0f7c0d0f5aaa895ec0a426334c` | **Frozen, LTV 0%** |
-| submit_score INV-003 (90) | `ad0942bafa9443966977d73189718aa22f78b766a6abd7e4dcef58af8c613821` | Dishonest score posted |
-| open_challenge (#1)       | `dfc4085365b27ac843342afa6dba9c48718a709f95e233941838e05e0ab57014` | Challenge opened |
-| resolve_challenge (upheld)| `f9231526dba6869087b08cf5f53fc87d9d1f93bb1d5cbbaef9f48c7b42da8687` | **Verifier slashed, INV-003 frozen** |
+| register_agent aggregator | `d610cac5b3c0925e8af94efc1ecf091e2b552e69ce3b916f0f6510ffe63e1f51` | Agent registered |
+| register_agent challenger | `7fd2efb353e5772e81d4097d244f18cd3441c4c30aa61da2fc1750733c255a77` | Agent registered |
+| post_bond aggregator (10) | `05c098cd6adeaa3f74e61e08f7dc1c0882e493e181b127a3fc33dc5c8f8fcadf` | Bond locked |
+| post_bond challenger (25) | `fa0ff60d280a4fe594bc2605be0242164d291244ce68a0fa830285a75c38f774` | Bond locked |
+| create_asset INV-001      | `59f503919b94411831529e645b26a55e5c29517ec88de41106c1c4358de074a9` | Asset created |
+| create_asset INV-002-DUP  | `7e84bf42924dbe48f970cc5556e075e48d97df176dd0fd3f925e0fed211aaa4c` | Asset created |
+| create_asset INV-003      | `b075dd7d34ff04167326eea110a91b67623cfd10cab8e940042ab97a44764e13` | Asset created |
+| submit_score INV-001 (94) | `fe6a8aff26d6b92e318d1c59b8962b8e781ce12d3f9a4277c382a257c52ec022` | Healthy, LTV 75% |
+| deposit_collateral INV-001| `2e48d4008580578ccb038fb6f181876cfe4e504409dad4b419ca5208b9738486` | Collateral 1000 |
+| borrow INV-001 (700)      | `5b0c1a44ef732ab91e0d21ff54c3742de4b848e4d3ca378862429844ad2b3138` | Reverted (ScoreStale) |
+| submit_score INV-002 (46) | `e560ea033483ca56229cb9bdc2158c505615c50a7e5f2629c5639ba940ebc804` | **Frozen, LTV 0%** |
+| submit_score INV-003 (98) | `ba5b9338598d04c2c70f923720e4bb7faadf9950497ed97cf3af0a5e4afd7be4` | Dishonest score posted |
+| open_challenge (#1)       | `35a8bf5e30ae56a0fe1c59f53125fa22ab93b3cc55735de0f45875093d78fce1` | Challenge opened |
+| resolve_challenge (upheld)| `8696659c12edcaf4444289e81edbd24c64f85503c99ca96725c903bb82014fae` | **Verifier slashed, INV-003 frozen** |
 
 **Final on-chain state (read back via the contract getters):**
 - `INV-001` → status Healthy, score 94, LTV 75%

@@ -28,7 +28,16 @@ require_contract_address() {
 
 # Run the livenet executor with a subcommand.
 wardens() {
-  ( cd "$CONTRACT" && cargo run --quiet --features livenet --bin wardens_livenet -- "$@" )
+  set +e
+  # Using stdbuf to prevent buffering issues if any, though rust usually flushes lines
+  ( cd "$CONTRACT" && cargo run --quiet --features livenet --bin wardens_livenet -- "$@" ) 2>&1 | while IFS= read -r line; do
+    echo "$line"
+    if [[ "$line" == *"OK "* || "$line" == *"SCORE_ID="* || "$line" == *"CHALLENGE_ID="* || "$line" == *"Copy CONTRACT_ADDRESS"* ]]; then
+      pkill -f "wardens_livenet.*$1" 2>/dev/null || true
+      break
+    fi
+  done
+  set -e
 }
 
 # Persist a KEY=VALUE into the state file (survives across scripts).
