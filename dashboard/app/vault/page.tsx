@@ -19,6 +19,7 @@ export default function VaultRegistry() {
   const [formError, setFormError] = useState("");
   const [successMsg, setSuccessMsg] = useState<{ id: string, hash: string, pending: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
   useEffect(() => {
     const load = () => Promise.all([getAssets(), getTransactions(), getAgents()]).then(([a, t, g]) => {
@@ -51,6 +52,7 @@ export default function VaultRegistry() {
     if (new Date(dueDate).getTime() <= Date.now()) return setFormError("Due date must be in the future.");
 
     setBusy(true);
+    setStatusText("Submitting to Casper Testnet...");
     try {
       const assetId = `INV-${Date.now()}-${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}`;
       const res = await post("/api/assets", { asset_id: assetId, issuer, debtor, faceValue: fv, dueDate, invoice_number: invoiceNumber, invoice_file_content: invoiceFile });
@@ -61,8 +63,9 @@ export default function VaultRegistry() {
         const isTimeout = !res.data?.error || res.data?.error?.includes("Gateway") || res.data?.error?.includes("Timeout") || res.data?.error?.includes("504") || res.data?.error?.includes("502");
         let found = false;
         if (isTimeout || res.ok === false) {
-          for (let attempt = 0; attempt < 40; attempt++) {
-            await new Promise((r) => setTimeout(r, 4000));
+          setStatusText("Awaiting Casper block confirmation (~2 mins)...");
+          for (let attempt = 0; attempt < 180; attempt++) {
+            await new Promise((r) => setTimeout(r, 3000));
             const currentAssets = await getAssets();
             const confirmedAsset = currentAssets.find((a: any) => a.asset_id === assetId);
             if (confirmedAsset) {
@@ -89,6 +92,7 @@ export default function VaultRegistry() {
       setFormError(err.message);
     } finally {
       setBusy(false);
+      setStatusText("");
     }
   };
 
@@ -203,7 +207,7 @@ export default function VaultRegistry() {
                 </div>
                 {formError && <div className="text-error text-label-md uppercase bg-error/10 p-xs neo-border-sm border-error">{formError}</div>}
                 <button type="submit" disabled={busy} className="bg-on-surface text-surface neo-border neobrutalist-btn p-xs uppercase text-label-md mt-xs disabled:opacity-50">
-                  {busy ? "Registering..." : "Register Asset"}
+                  {busy ? (statusText || "Registering...") : "Register Asset"}
                 </button>
               </form>
             </div>
