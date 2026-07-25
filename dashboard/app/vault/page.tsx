@@ -24,7 +24,7 @@ export default function VaultRegistry() {
   useEffect(() => {
     const load = () => Promise.all([getAssets(), getTransactions(), getAgents()]).then(([a, t, g]) => {
       setAssets(a); setTxs(t); setAgents(g);
-      // Auto-resolve pending deploy hash once the real 64-char hash arrives in the tx ledger
+      // Auto-dismiss the queue banner once the real 64-char hash arrives in the tx ledger
       setSuccessMsg((prev) => {
         if (!prev || !prev.pending) return prev;
         const confirmed = t.find((tx: any) =>
@@ -32,7 +32,7 @@ export default function VaultRegistry() {
           tx.action === "create_asset" &&
           tx.result?.includes(prev.id)
         );
-        if (confirmed) return { ...prev, hash: confirmed.deploy_hash, pending: false };
+        if (confirmed) return null; // Just dismiss the banner, they can see it in the list!
         return prev;
       });
     });
@@ -125,17 +125,11 @@ export default function VaultRegistry() {
         <div className="md:col-span-4 flex flex-col gap-lg">
           {successMsg && (
             <div className="neo-border bg-primary-container text-on-primary p-md neo-shadow animate-in fade-in">
-              <p className="text-body-lg font-bold mb-xs">Registered {successMsg.id}!</p>
-              {successMsg.pending ? (
-                <div className="flex items-center gap-xs mt-xs">
-                  <span className="inline-block w-3 h-3 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
-                  <span className="text-label-md">Submitting to Casper Testnet… (30–90 s)</span>
-                </div>
-              ) : (
-                <a href={explorerLink(successMsg.hash)} target="_blank" rel="noreferrer" className="underline text-label-md">
-                  View on Casper Explorer → {successMsg.hash.slice(0, 12)}…
-                </a>
-              )}
+              <p className="text-body-lg font-bold mb-xs">Transaction queued: {successMsg.id}</p>
+              <div className="flex items-center gap-xs mt-xs">
+                <span className="inline-block w-3 h-3 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
+                <span className="text-label-md">Wait until the transaction appears in the vault registry...</span>
+              </div>
             </div>
           )}
 
