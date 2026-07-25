@@ -83,9 +83,17 @@ function loadPersistedTransactions() {
     // Merge into casper.txs without duplicating existing entries
     const existingHashes = new Set(casper.txs.map((t) => t.deploy_hash));
     for (const tx of txs) {
-      if (!existingHashes.has(tx.deploy_hash)) casper.txs.push(tx);
+      if (!existingHashes.has(tx.deploy_hash)) {
+        // FILTER OUT LEGACY TRANSACTIONS
+        const tsMatch = tx.result?.match(/INV-(\d+)-/);
+        if (tsMatch) {
+          const ts = parseInt(tsMatch[1], 10);
+          if (ts > 1000000000000 && ts < 1784968500000) continue;
+        }
+        casper.txs.push(tx);
+      }
     }
-    console.log(`[chainSync] loaded ${txs.length} verified on-chain transactions from disk.`);
+    console.log(`[chainSync] loaded ${casper.txs.length} verified on-chain transactions from disk.`);
   } catch (e) {
     console.warn("[chainSync] could not load persisted transactions:", (e as Error).message);
   }
@@ -147,6 +155,13 @@ function applyChainData(d: DumpData): void {
   const now = Date.now();
   if (d.asset) {
     const a = d.asset;
+    
+    // FILTER OUT LEGACY ASSETS FOR A CLEAN DASHBOARD
+    const tsMatch = a.asset_id.match(/INV-(\d+)-/);
+    if (tsMatch) {
+      const ts = parseInt(tsMatch[1], 10);
+      if (ts > 1000000000000 && ts < 1784968500000) return; // Ignore old assets
+    }
     const asset: Asset = {
       asset_id: a.asset_id, issuer: a.issuer, debtor: a.debtor,
       face_value: Number(a.face_value), due_date: 0, evidence_hash: "(on-chain)",
