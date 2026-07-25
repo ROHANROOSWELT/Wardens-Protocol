@@ -59,9 +59,10 @@ app.get("/api/dashboard/:asset_id", async (req, res) => {
   if (!asset) return res.status(404).json({ error: "AssetNotFound" });
   const position = casper.positions.get(asset_id) ?? null;
   const challenges = [...casper.challenges.values()].filter((c) => c.asset_id === asset_id);
-  const transactions = casper.txs.filter(
-    (t) => typeof t.result === "string" // include all; ordered chronologically
-  );
+  const transactions = casper.txs.map((t) => ({
+    ...t,
+    confirmed: /^[a-fA-F0-9]{64}$/.test(t.deploy_hash),
+  }));
   res.json({
     asset,
     current_score: asset.current_score,
@@ -79,7 +80,15 @@ app.get("/api/dashboard/:asset_id", async (req, res) => {
 });
 
 // Global tx timeline (dashboard timeline helper).
-app.get("/api/transactions", (_req, res) => res.json(casper.txs));
+// Returns all transactions; each entry has a `confirmed` boolean.
+// Only entries with a real 64-char hex deploy_hash are confirmed on-chain.
+app.get("/api/transactions", (_req, res) => {
+  const txs = casper.txs.map((t) => ({
+    ...t,
+    confirmed: /^[a-fA-F0-9]{64}$/.test(t.deploy_hash),
+  }));
+  res.json(txs);
+});
 
 // Chain info: mode + deployed contract, so the dashboard can show a LIVE badge.
 app.get("/api/chain/info", (_req, res) => {

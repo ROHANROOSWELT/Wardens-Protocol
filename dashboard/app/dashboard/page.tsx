@@ -190,14 +190,18 @@ export default function ControlRoom() {
               <path className="pulse-path" d={pathD} fill="none" stroke="#6C698D" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <div className="text-label-md text-on-surface-variant uppercase mt-sm">{txs.length} on-chain actions recorded</div>
+          <div className="text-label-md text-on-surface-variant uppercase mt-sm">{txs.filter((t: any) => t.confirmed).length} confirmed on-chain · {txs.filter((t: any) => !t.confirmed).length} pending</div>
         </div>
       </div>
 
       {/* Real stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-gutter">
         <StatCard label="Tracked Assets" value={String(assets.length)} sub={`${scored.length} scored`} />
-        <StatCard label="On-chain Transactions" value={String(txs.length)} sub={isChain ? "Casper Testnet" : "sim"} />
+        <StatCard
+          label="On-chain Transactions"
+          value={String(txs.filter((t: any) => t.confirmed).length)}
+          sub={txs.some((t: any) => !t.confirmed) ? `+${txs.filter((t: any) => !t.confirmed).length} pending` : "Casper Testnet"}
+        />
         <StatCard label="Slashed Verifiers" value={String(slashed)} sub={`${agents.length} agents registered`} highlight={slashed > 0} />
       </div>
 
@@ -244,13 +248,25 @@ export default function ControlRoom() {
       <div className="border-[4px] border-on-surface bg-surface neobrutalist-shadow p-md">
         <h2 className="text-headline-md font-black uppercase border-b-[3px] border-on-surface pb-sm mb-sm">Casper Transaction Timeline</h2>
         <div className="flex flex-col gap-xs max-h-[300px] overflow-auto">
-          {txs.slice().reverse().map((t, i) => (
-            <a key={i} href={explorerLink(t.deploy_hash)} target="_blank" rel="noreferrer"
-              className="flex justify-between gap-md border-[2px] border-on-surface bg-surface-container-low px-sm py-xs hover:bg-primary-fixed transition-colors">
-              <span className="font-bold uppercase text-label-md">{t.action}</span>
-              <span className="text-on-surface-variant text-body-md truncate">{t.result}</span>
-              <span className="font-mono-plex text-label-md text-primary">{t.deploy_hash.slice(0, 14)}…</span>
-            </a>
+          {txs.slice().reverse().map((t: any, i: number) => (
+            t.confirmed ? (
+              <a key={i} href={explorerLink(t.deploy_hash)} target="_blank" rel="noreferrer"
+                className="flex justify-between gap-md border-[2px] border-on-surface bg-surface-container-low px-sm py-xs hover:bg-primary-fixed transition-colors">
+                <span className="font-bold uppercase text-label-md">{t.action}</span>
+                <span className="text-on-surface-variant text-body-md truncate">{t.result}</span>
+                <span className="font-mono-plex text-label-md text-primary">{t.deploy_hash.slice(0, 14)}…</span>
+              </a>
+            ) : (
+              <div key={i}
+                className="flex justify-between gap-md border-[2px] border-on-surface border-dashed bg-surface-container-low px-sm py-xs opacity-70">
+                <span className="font-bold uppercase text-label-md">{t.action}</span>
+                <span className="text-on-surface-variant text-body-md truncate">{t.result}</span>
+                <span className="font-mono-plex text-label-md flex items-center gap-xs">
+                  <span className="inline-block w-2 h-2 border border-current border-t-transparent rounded-full animate-spin" />
+                  pending…
+                </span>
+              </div>
+            )
           ))}
           {txs.length === 0 && <div className="text-on-surface-variant">No transactions yet — run the console.</div>}
         </div>

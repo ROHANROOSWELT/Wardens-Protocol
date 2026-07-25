@@ -17,11 +17,24 @@ export default function VaultRegistry() {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ issuer: "", debtor: "", faceValue: "", dueDate: "", invoiceNumber: "", invoiceFile: "" });
   const [formError, setFormError] = useState("");
-  const [successMsg, setSuccessMsg] = useState<{ id: string, hash: string } | null>(null);
+  const [successMsg, setSuccessMsg] = useState<{ id: string, hash: string, pending: boolean } | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const load = () => Promise.all([getAssets(), getTransactions(), getAgents()]).then(([a, t, g]) => { setAssets(a); setTxs(t); setAgents(g); });
+    const load = () => Promise.all([getAssets(), getTransactions(), getAgents()]).then(([a, t, g]) => {
+      setAssets(a); setTxs(t); setAgents(g);
+      // Auto-resolve pending deploy hash once the real 64-char hash arrives in the tx ledger
+      setSuccessMsg((prev) => {
+        if (!prev || !prev.pending) return prev;
+        const confirmed = t.find((tx: any) =>
+          /^[a-fA-F0-9]{64}$/.test(tx.deploy_hash) &&
+          tx.action === "create_asset" &&
+          tx.result?.includes(prev.id)
+        );
+        if (confirmed) return { ...prev, hash: confirmed.deploy_hash, pending: false };
+        return prev;
+      });
+    });
     load(); const i = setInterval(load, 3000); return () => clearInterval(i);
   }, []);
 
@@ -47,7 +60,8 @@ export default function VaultRegistry() {
         setFormData({ issuer: "", debtor: "", faceValue: "", dueDate: "", invoiceNumber: "", invoiceFile: "" });
         const [a, t, g] = await Promise.all([getAssets(), getTransactions(), getAgents()]);
         setAssets(a); setTxs(t); setAgents(g);
-        setSuccessMsg({ id: res.data.asset_id, hash: res.data.deploy_hash });
+        const isPlaceholder = !res.data.deploy_hash || res.data.deploy_hash.startsWith("cspr-");
+        setSuccessMsg({ id: res.data.asset_id, hash: res.data.deploy_hash, pending: isPlaceholder });
       }
     } catch (err: any) {
       setFormError(err.message);
@@ -106,8 +120,17 @@ export default function VaultRegistry() {
         <div className="md:col-span-4 flex flex-col gap-lg">
           {successMsg && (
             <div className="neo-border bg-primary-container text-on-primary p-md neo-shadow animate-in fade-in">
-              <p className="text-body-lg font-bold mb-xs">Successfully registered {successMsg.id}!</p>
-              <a href={explorerLink(successMsg.hash)} target="_blank" rel="noreferrer" className="underline text-label-md">View on Casper Explorer →</a>
+              <p className="text-body-lg font-bold mb-xs">Registered {successMsg.id}!</p>
+              {successMsg.pending ? (
+                <div className="flex items-center gap-xs mt-xs">
+                  <span className="inline-block w-3 h-3 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
+                  <span className="text-label-md">Submitting to Casper Testnet… (30–90 s)</span>
+                </div>
+              ) : (
+                <a href={explorerLink(successMsg.hash)} target="_blank" rel="noreferrer" className="underline text-label-md">
+                  View on Casper Explorer → {successMsg.hash.slice(0, 12)}…
+                </a>
+              )}
             </div>
           )}
 

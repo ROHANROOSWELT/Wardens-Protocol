@@ -1,18 +1,17 @@
-// casperClient — the backend's gateway to WardensCore.
+// casperClient — the backend's ONLY gateway to WardensCore on Casper Testnet.
 //
-// Two modes (WARDENS_MODE env):
-//  * "sim"  (default): an in-process mirror of the WardensCore contract so the
-//    entire Section 3 loop runs end-to-end offline with deterministic pseudo
-//    deploy hashes. This is what powers the dashboard during development and
-//    when a funded testnet node is not wired up.
-//  * "chain": submit real deploys to the deployed WardensCore contract. Wiring
-//    (node URL, contract hash, signing key) is filled in scripts/deploy.sh and
-//    documented in PROOF.md; the on-chain semantics are identical to the sim.
+// This file does NOT have a simulation mode. Every operation submits a real
+// deploy to the Casper Testnet via the livenet CLI binary.
 //
-// The sim mirrors contracts/wardens_core/src exactly: LTV table, <50 freeze,
-// 600s staleness, challenge slash/reward. Keeping them in lockstep means the
-// demo behaves the same whether or not a node is attached.
-import { createHash } from "node:crypto";
+// Required environment variables (set in ecosystem.config.js or .env):
+//   WARDENS_MODE=chain
+//   WARDENS_CORE_ADDRESS=contract-package-<hash>
+//   ODRA_CASPER_LIVENET_NODE_ADDRESS=https://node.testnet.casper.network/rpc
+//   ODRA_CASPER_LIVENET_CHAIN_NAME=casper-test
+//   ODRA_CASPER_LIVENET_SECRET_KEY_PATH=/path/to/secret_key.pem
+//   ODRA_CASPER_LIVENET_EVENTS_URL=http://<node>:9999/events/main
+//
+// If WARDENS_MODE is not "chain", ALL operations throw — there is no fallback.
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
@@ -49,8 +48,7 @@ export interface Agent {
   successful_reports: number;
   slashed_count: number;
   active: boolean;
-  /** x402 payment price in motes. Sourced from BondVault.get_agent().x402_price in chain mode,
-   *  or set at registration time in sim mode. Never a hardcoded constant. */
+  /** x402 payment price in motes. Sourced from BondVault.get_agent().x402_price in chain mode. */
   x402_price: number;
 }
 
@@ -92,7 +90,16 @@ const CONTRACT_DIR = `${ROOT}/contracts/wardens_core`;
 const RELEASE_BIN = `${CONTRACT_DIR}/target/release/wardens_livenet`;
 const DEBUG_BIN = `${CONTRACT_DIR}/target/debug/wardens_livenet`;
 const BIN = existsSync(RELEASE_BIN) ? RELEASE_BIN : DEBUG_BIN;
-const MODE = process.env.WARDENS_MODE ?? "sim";
+
+function assertChainMode() {
+  const mode = process.env.WARDENS_MODE;
+  if (mode !== "chain") {
+    throw new Error(
+      `WARDENS_MODE is "${mode ?? "unset"}" — must be "chain". ` +
+      `Set WARDENS_MODE=chain in your environment or ecosystem.config.js.`
+    );
+  }
+}
 
 function formatAddress(addr: string): string {
   if (addr.startsWith("hash-")) {
@@ -120,23 +127,23 @@ function getLivenetEnv() {
   return {
     ...process.env,
     WARDENS_CORE_ADDRESS: formattedAddr,
-    ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "https://node.testnet.casper.network/rpc",
-    ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "casper-test",
+    ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || "https://node.testnet.casper.network/rpc",
+    ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || "casper-test",
     ODRA_CASPER_LIVENET_SECRET_KEY_PATH: resolveSecretKeyPath(),
-    ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "http://node.testnet.casper.network:9999/events/main",
+    ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || "http://node.testnet.casper.network:9999/events/main",
   };
 }
 
 function runLivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string; deployHash: string }> {
   return new Promise((resolve, reject) => {
     if (!existsSync(BIN)) {
-      return reject(new Error(`livenet executor not built at ${BIN} — run cargo build --features livenet --bin wardens_livenet`));
+      return reject(new Error(
+        `Livenet binary not found at ${BIN}. ` +
+        `Build it first: cd contracts/wardens_core && cargo build --features livenet --bin wardens_livenet`
+      ));
     }
     const envs = getLivenetEnv();
-    const child = spawn(BIN, args, {
-      cwd: CONTRACT_DIR,
-      env: envs,
-    });
+    const child = spawn(BIN, args, { cwd: CONTRACT_DIR, env: envs });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => (stdout += d));
@@ -153,14 +160,17 @@ function runLivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string
         combined.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i);
       // Reject if no real on-chain deploy hash found — never fabricate a fake hash.
       if (!match) {
-        return reject(new Error(`No deploy hash in CLI output. Raw output: ${combined.slice(-600)}`));
+        return reject(new Error(
+          `No deploy hash found in CLI output — the transaction may not have been submitted.\n` +
+          `Raw output (last 600 chars): ${combined.slice(-600)}`
+        ));
       }
       resolve({ stdout, stderr, deployHash: match[1] });
     });
   });
 }
 
-class WardensCoreSim {
+class WardensChainClient {
   assets = new Map<string, Asset>();
   agents = new Map<string, Agent>();
   scores = new Map<number, TrustScore>();
@@ -170,29 +180,6 @@ class WardensCoreSim {
   scoreCount = 0;
   challengeCount = 0;
   txs: TxRecord[] = [];
-  private nonce = 0;
-
-  private now(): number {
-    return Date.now();
-  }
-
-  private hash(action: string, payload: unknown): string {
-    this.nonce += 1;
-    return createHash("sha256")
-      .update(`${action}:${JSON.stringify(payload)}:${this.nonce}`)
-      .digest("hex");
-  }
-
-  private record(action: string, payload: unknown, result: string): TxRecord {
-    const tx: TxRecord = {
-      action,
-      deploy_hash: this.hash(action, payload),
-      result,
-      timestamp: this.now(),
-    };
-    this.txs.push(tx);
-    return tx;
-  }
 
   async createAsset(a: {
     asset_id: string;
@@ -202,8 +189,20 @@ class WardensCoreSim {
     due_date: number;
     evidence_hash: string;
   }): Promise<TxRecord> {
-    const now = this.now();
-    // 1. Optimistically update read model immediately
+    assertChainMode();
+    const { syncAssetFromChain, trackAssetLocally, persistTransaction, replaceTransaction } = await import("./chainSync.ts");
+    trackAssetLocally(a.asset_id);
+
+    const placeholderHash = "cspr-" + a.evidence_hash.substring(7, 39);
+    const queuedTx: TxRecord = {
+      action: "create_asset",
+      deploy_hash: placeholderHash,
+      result: `Asset ${a.asset_id} queued on-chain`,
+      timestamp: Date.now(),
+    };
+
+    // Optimistically add to read model so UI can show it immediately
+    const now = Date.now();
     this.assets.set(a.asset_id, {
       ...a,
       status: "Active",
@@ -211,55 +210,40 @@ class WardensCoreSim {
       created_at: now,
       updated_at: now,
     });
+    this.txs.push(queuedTx);
+    persistTransaction(queuedTx);
 
-    if (MODE === "chain") {
-      const { syncAssetFromChain, trackAssetLocally, persistTransaction, replaceTransaction } = await import("./chainSync.ts");
-      trackAssetLocally(a.asset_id);
-
-      const placeholderHash = "cspr-" + a.evidence_hash.substring(7, 39);
-      const queuedTx: TxRecord = {
+    // Submit to Casper Testnet — runs async, replaces placeholder when confirmed
+    runLivenetCmd([
+      "create_asset",
+      a.asset_id,
+      a.issuer,
+      a.debtor,
+      a.face_value.toString(),
+      a.due_date.toString(),
+      a.evidence_hash,
+    ]).then(async ({ deployHash }) => {
+      console.log(`[casperClient] ✓ Asset ${a.asset_id} on-chain: ${deployHash}`);
+      await syncAssetFromChain(a.asset_id);
+      const realTx: TxRecord = {
         action: "create_asset",
-        deploy_hash: placeholderHash,
-        result: `Asset ${a.asset_id} queued on-chain`,
-        timestamp: Date.now(),
+        deploy_hash: deployHash,
+        result: `Asset ${a.asset_id} created`,
+        timestamp: queuedTx.timestamp,
       };
-      this.txs.push(queuedTx);
-      // Persist placeholder so it shows in UI immediately
-      persistTransaction(queuedTx);
+      const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
+      if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
+      replaceTransaction(placeholderHash, realTx);
+    }).catch((e) => console.error(`[casperClient] createAsset on-chain error:`, e));
 
-      // Submit to Casper Testnet asynchronously in background
-      runLivenetCmd([
-        "create_asset",
-        a.asset_id,
-        a.issuer,
-        a.debtor,
-        a.face_value.toString(),
-        a.due_date.toString(),
-        a.evidence_hash,
-      ]).then(async ({ deployHash }) => {
-        console.log(`[casperClient] SUCCESS: Asset ${a.asset_id} created on-chain with deploy hash: ${deployHash}`);
-        await syncAssetFromChain(a.asset_id);
-
-        // Swap placeholder with real confirmed tx — both in-memory and on disk
-        const realTx: TxRecord = {
-          action: "create_asset",
-          deploy_hash: deployHash,
-          result: `Asset ${a.asset_id} created`,
-          timestamp: queuedTx.timestamp,
-        };
-        // Scan by placeholder hash (safe across process restarts)
-        const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
-        if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
-        replaceTransaction(placeholderHash, realTx);
-      }).catch(e => console.error(`[casperClient] createAsset on-chain error:`, e));
-
-      return queuedTx;
-    }
-
-    return this.record("create_asset", a, `Asset ${a.asset_id} created`);
+    return queuedTx;
   }
 
   async registerAgent(agent_id: string, role: string): Promise<TxRecord> {
+    assertChainMode();
+    const { persistTransaction, replaceTransaction } = await import("./chainSync.ts");
+
+    // Optimistically seed into read model
     this.agents.set(agent_id, {
       agent_id,
       role,
@@ -272,22 +256,19 @@ class WardensCoreSim {
       x402_price: 1_000_000,
     });
 
-    if (MODE === "chain") {
-      const placeholderHash = `cspr-reg-${Date.now()}`;
-      const queuedTx: TxRecord = {
-        action: "register_agent",
-        deploy_hash: placeholderHash,
-        result: `Agent ${agent_id} queued on-chain`,
-        timestamp: Date.now(),
-      };
-      this.txs.push(queuedTx);
+    const placeholderHash = `cspr-reg-${Date.now()}`;
+    const queuedTx: TxRecord = {
+      action: "register_agent",
+      deploy_hash: placeholderHash,
+      result: `Agent ${agent_id} queued on-chain`,
+      timestamp: Date.now(),
+    };
+    this.txs.push(queuedTx);
+    persistTransaction(queuedTx);
 
-      runLivenetCmd([
-        "register_agent",
-        agent_id,
-        role.toLowerCase(),
-      ]).then(async ({ deployHash }) => {
-        const { persistTransaction, replaceTransaction } = await import("./chainSync.ts");
+    runLivenetCmd(["register_agent", agent_id, role.toLowerCase()])
+      .then(async ({ deployHash }) => {
+        console.log(`[casperClient] ✓ Agent ${agent_id} registered on-chain: ${deployHash}`);
         const realTx: TxRecord = {
           action: "register_agent",
           deploy_hash: deployHash,
@@ -297,37 +278,36 @@ class WardensCoreSim {
         const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
         if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
         replaceTransaction(placeholderHash, realTx);
-      }).catch(e => console.error(`[casperClient] registerAgent on-chain error:`, e));
+      })
+      .catch((e) => console.error(`[casperClient] registerAgent on-chain error:`, e));
 
-      return queuedTx;
-    }
-
-    return this.record("register_agent", { agent_id, role }, `Agent ${agent_id} registered`);
+    return queuedTx;
   }
 
   async postBond(agent_id: string, amount: number): Promise<TxRecord> {
+    assertChainMode();
+    const { persistTransaction, replaceTransaction } = await import("./chainSync.ts");
+
+    // Optimistically update read model
     const agent = this.agents.get(agent_id);
     if (agent) {
       agent.bonded_amount += amount;
       agent.active = true;
     }
 
-    if (MODE === "chain") {
-      const placeholderHash = `cspr-bond-${Date.now()}`;
-      const queuedTx: TxRecord = {
-        action: "post_bond",
-        deploy_hash: placeholderHash,
-        result: `Bond ${amount} queued on-chain`,
-        timestamp: Date.now(),
-      };
-      this.txs.push(queuedTx);
+    const placeholderHash = `cspr-bond-${Date.now()}`;
+    const queuedTx: TxRecord = {
+      action: "post_bond",
+      deploy_hash: placeholderHash,
+      result: `Bond ${amount} queued on-chain`,
+      timestamp: Date.now(),
+    };
+    this.txs.push(queuedTx);
+    persistTransaction(queuedTx);
 
-      runLivenetCmd([
-        "post_bond",
-        agent_id,
-        amount.toString(),
-      ]).then(async ({ deployHash }) => {
-        const { replaceTransaction } = await import("./chainSync.ts");
+    runLivenetCmd(["post_bond", agent_id, amount.toString()])
+      .then(async ({ deployHash }) => {
+        console.log(`[casperClient] ✓ Bond ${amount} posted for ${agent_id}: ${deployHash}`);
         const realTx: TxRecord = {
           action: "post_bond",
           deploy_hash: deployHash,
@@ -337,15 +317,10 @@ class WardensCoreSim {
         const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
         if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
         replaceTransaction(placeholderHash, realTx);
-      }).catch(e => console.error(`[casperClient] postBond on-chain error:`, e));
+      })
+      .catch((e) => console.error(`[casperClient] postBond on-chain error:`, e));
 
-      return queuedTx;
-    }
-
-    const a = this.mustAgent(agent_id);
-    a.bonded_amount += amount;
-    a.active = true;
-    return this.record("post_bond", { agent_id, amount }, `Bond ${amount} locked`);
+    return queuedTx;
   }
 
   async submitScore(s: {
@@ -355,42 +330,36 @@ class WardensCoreSim {
     evidence_hash: string;
     explanation_hash: string;
   }): Promise<TxRecord & { score_id: number }> {
-    if (MODE === "chain") {
-      const { stdout, deployHash } = await runLivenetCmd([
-        "submit_score",
-        s.asset_id,
-        s.score.toString(),
-        s.agent_id,
-        s.evidence_hash,
-        s.explanation_hash,
-      ]);
-      const scoreIdMatch = stdout.match(/SCORE_ID=(\d+)/);
-      const score_id = scoreIdMatch ? Number(scoreIdMatch[1]) : 0;
-      
-      const { syncAssetFromChain } = await import("./chainSync.ts");
-      await syncAssetFromChain(s.asset_id);
-      
-      const tx: TxRecord = {
-        action: "submit_score",
-        deploy_hash: deployHash,
-        result: `Score ${s.score}`,
-        timestamp: Date.now(),
-      };
-      this.txs.push(tx);
-      const { persistTransaction } = await import("./chainSync.ts");
-      persistTransaction(tx);
-      return { ...tx, score_id };
-    }
+    assertChainMode();
+    const { stdout, deployHash } = await runLivenetCmd([
+      "submit_score",
+      s.asset_id,
+      s.score.toString(),
+      s.agent_id,
+      s.evidence_hash,
+      s.explanation_hash,
+    ]);
+    const scoreIdMatch = stdout.match(/SCORE_ID=(\d+)/);
+    const score_id = scoreIdMatch ? Number(scoreIdMatch[1]) : 0;
 
-    if (s.score > 100) throw new Error("InvalidScore");
-    const agent = this.mustAgent(s.agent_id);
-    if (!agent.active || agent.bonded_amount <= 0) throw new Error("AgentNotBonded");
-    const asset = this.mustAsset(s.asset_id);
-    const now = this.now();
+    const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
+    await syncAssetFromChain(s.asset_id);
+
+    const tx: TxRecord = {
+      action: "submit_score",
+      deploy_hash: deployHash,
+      result: `Score ${s.score}`,
+      timestamp: Date.now(),
+    };
+    this.txs.push(tx);
+    persistTransaction(tx);
+
+    // Update in-memory scores so LTV/status is fresh
     this.scoreCount += 1;
-    const score_id = this.scoreCount;
-    this.scores.set(score_id, {
-      score_id,
+    const sid = score_id || this.scoreCount;
+    const now = Date.now();
+    this.scores.set(sid, {
+      score_id: sid,
       asset_id: s.asset_id,
       score: s.score,
       agent_id: s.agent_id,
@@ -401,118 +370,85 @@ class WardensCoreSim {
       challenged: false,
     });
     const ids = this.assetScoreIds.get(s.asset_id) ?? [];
-    ids.push(score_id);
+    ids.push(sid);
     this.assetScoreIds.set(s.asset_id, ids);
 
-    asset.current_score = s.score;
-    asset.status = statusForScore(s.score);
-    asset.updated_at = now;
-    agent.total_reports += 1;
-
-    const tx = this.record("submit_score", s, `Score ${s.score}`);
-    this.applyLtv(s.asset_id, ltvForScore(s.score));
-    if (s.score < 50) this.freeze(s.asset_id, "score below 50");
-    return { ...tx, score_id };
-  }
-
-  private applyLtv(asset_id: string, new_ltv: number) {
-    const pos = this.positions.get(asset_id);
-    if (pos) {
-      pos.current_ltv = new_ltv;
-      pos.frozen = new_ltv === 0;
+    const asset = this.assets.get(s.asset_id);
+    if (asset) {
+      asset.current_score = s.score;
+      asset.status = statusForScore(s.score);
+      asset.updated_at = now;
     }
-    this.record("vault_ltv_updated", { asset_id, new_ltv }, `LTV ${new_ltv}%`);
-  }
 
-  private freeze(asset_id: string, reason: string) {
-    const asset = this.mustAsset(asset_id);
-    asset.status = "Frozen";
-    asset.updated_at = this.now();
-    const pos = this.positions.get(asset_id);
-    if (pos) {
-      pos.frozen = true;
-      pos.current_ltv = 0;
-    }
-    this.record("freeze_asset", { asset_id, reason }, `Frozen: ${reason}`);
+    return { ...tx, score_id: sid };
   }
 
   async depositCollateral(asset_id: string, collateral_value: number): Promise<TxRecord> {
-    if (MODE === "chain") {
-      const { deployHash } = await runLivenetCmd([
-        "deposit_collateral",
-        asset_id,
-        collateral_value.toString(),
-      ]);
-      const { syncAssetFromChain } = await import("./chainSync.ts");
-      await syncAssetFromChain(asset_id);
-      
-      const tx: TxRecord = {
-        action: "deposit_collateral",
-        deploy_hash: deployHash,
-        result: `Collateral ${collateral_value}`,
-        timestamp: Date.now(),
-      };
-      this.txs.push(tx);
-      return tx;
-    }
+    assertChainMode();
+    const { deployHash } = await runLivenetCmd([
+      "deposit_collateral",
+      asset_id,
+      collateral_value.toString(),
+    ]);
+    const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
+    await syncAssetFromChain(asset_id);
 
-    const asset = this.mustAsset(asset_id);
-    const ltv = ltvForScore(asset.current_score);
+    const asset = this.assets.get(asset_id);
+    const ltv = asset ? ltvForScore(asset.current_score) : 0;
     this.positions.set(asset_id, {
       asset_id,
       collateral_value,
       borrowed_amount: 0,
       current_ltv: ltv,
-      frozen: asset.status === "Frozen" || ltv === 0,
+      frozen: asset?.status === "Frozen" || ltv === 0,
     });
-    return this.record("deposit_collateral", { asset_id, collateral_value }, `Collateral ${collateral_value}`);
+
+    const tx: TxRecord = {
+      action: "deposit_collateral",
+      deploy_hash: deployHash,
+      result: `Collateral ${collateral_value}`,
+      timestamp: Date.now(),
+    };
+    this.txs.push(tx);
+    persistTransaction(tx);
+    return tx;
   }
 
   isStale(asset_id: string): boolean {
     const ids = this.assetScoreIds.get(asset_id) ?? [];
     if (ids.length === 0) return true;
     const latest = this.scores.get(ids[ids.length - 1]!)!;
-    return this.now() - latest.timestamp > STALENESS_WINDOW_SECONDS * 1000;
+    return Date.now() - latest.timestamp > STALENESS_WINDOW_SECONDS * 1000;
   }
 
   currentLtv(asset_id: string): number {
-    const asset = this.mustAsset(asset_id);
-    if (asset.status === "Frozen" || this.isStale(asset_id)) return 0;
+    const asset = this.assets.get(asset_id);
+    if (!asset || asset.status === "Frozen" || this.isStale(asset_id)) return 0;
     return ltvForScore(asset.current_score);
   }
 
   async borrow(asset_id: string, amount: number): Promise<TxRecord> {
-    if (MODE === "chain") {
-      const { deployHash } = await runLivenetCmd([
-        "borrow",
-        asset_id,
-        amount.toString(),
-      ]);
-      const { syncAssetFromChain } = await import("./chainSync.ts");
-      await syncAssetFromChain(asset_id);
-      
-      const tx: TxRecord = {
-        action: "borrow",
-        deploy_hash: deployHash,
-        result: `Borrowed ${amount}`,
-        timestamp: Date.now(),
-      };
-      this.txs.push(tx);
-      return tx;
-    }
+    assertChainMode();
+    const { deployHash } = await runLivenetCmd([
+      "borrow",
+      asset_id,
+      amount.toString(),
+    ]);
+    const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
+    await syncAssetFromChain(asset_id);
 
-    const asset = this.mustAsset(asset_id);
     const pos = this.positions.get(asset_id);
-    if (!pos) throw new Error("VaultPositionNotFound");
-    if (pos.frozen || asset.status === "Frozen") throw new Error("AssetFrozen");
-    if (this.isStale(asset_id)) throw new Error("ScoreStale");
-    const ltv = ltvForScore(asset.current_score);
-    if (ltv === 0) throw new Error("AssetFrozen");
-    const maxBorrow = Math.floor((pos.collateral_value * ltv) / 100);
-    if (pos.borrowed_amount + amount > maxBorrow) throw new Error("ExceedsLtv");
-    pos.borrowed_amount += amount;
-    pos.current_ltv = ltv;
-    return this.record("borrow", { asset_id, amount }, `Borrowed ${amount}`);
+    if (pos) pos.borrowed_amount += amount;
+
+    const tx: TxRecord = {
+      action: "borrow",
+      deploy_hash: deployHash,
+      result: `Borrowed ${amount}`,
+      timestamp: Date.now(),
+    };
+    this.txs.push(tx);
+    persistTransaction(tx);
+    return tx;
   }
 
   async openChallenge(c: {
@@ -521,117 +457,77 @@ class WardensCoreSim {
     counter_evidence_hash: string;
     counter_bond: number;
   }): Promise<TxRecord & { challenge_id: number }> {
-    if (MODE === "chain") {
-      const { stdout, deployHash } = await runLivenetCmd([
-        "open_challenge",
-        c.score_id.toString(),
-        c.challenger_agent_id,
-        c.counter_evidence_hash,
-        c.counter_bond.toString(),
-      ]);
-      const challengeIdMatch = stdout.match(/CHALLENGE_ID=(\d+)/);
-      const challenge_id = challengeIdMatch ? Number(challengeIdMatch[1]) : 0;
-      
-      const { syncAssetFromChain } = await import("./chainSync.ts");
-      const score = this.scores.get(c.score_id);
-      const assetId = score ? score.asset_id : "";
-      await syncAssetFromChain(assetId);
-      
-      const tx: TxRecord = {
-        action: "open_challenge",
-        deploy_hash: deployHash,
-        result: `Challenge ${challenge_id} opened`,
-        timestamp: Date.now(),
-      };
-      this.txs.push(tx);
-      return { ...tx, challenge_id };
-    }
+    assertChainMode();
+    const { stdout, deployHash } = await runLivenetCmd([
+      "open_challenge",
+      c.score_id.toString(),
+      c.challenger_agent_id,
+      c.counter_evidence_hash,
+      c.counter_bond.toString(),
+    ]);
+    const challengeIdMatch = stdout.match(/CHALLENGE_ID=(\d+)/);
+    const challenge_id = challengeIdMatch ? Number(challengeIdMatch[1]) : 0;
 
+    const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
     const score = this.scores.get(c.score_id);
-    if (!score) throw new Error("ScoreNotFound");
-    if (this.now() > score.challenge_deadline) throw new Error("ChallengeWindowClosed");
-    const challenger = this.mustAgent(c.challenger_agent_id);
-    if (!challenger.active || challenger.bonded_amount <= 0) throw new Error("AgentNotBonded");
-    if (challenger.role !== "Challenger") throw new Error("WrongRole");
-    this.challengeCount += 1;
-    const challenge_id = this.challengeCount;
-    this.challenges.set(challenge_id, {
-      challenge_id,
-      asset_id: score.asset_id,
-      score_id: c.score_id,
-      challenger_agent_id: c.challenger_agent_id,
-      challenged_agent_id: score.agent_id,
-      counter_evidence_hash: c.counter_evidence_hash,
-      counter_bond: c.counter_bond,
-      status: "Open",
-      opened_at: this.now(),
-      resolved_at: 0,
-    });
-    score.challenged = true;
-    const tx = this.record("open_challenge", c, `Challenge ${challenge_id} opened`);
+    const assetId = score ? score.asset_id : "";
+    if (assetId) await syncAssetFromChain(assetId);
+
+    const tx: TxRecord = {
+      action: "open_challenge",
+      deploy_hash: deployHash,
+      result: `Challenge ${challenge_id} opened`,
+      timestamp: Date.now(),
+    };
+    this.txs.push(tx);
+    persistTransaction(tx);
     return { ...tx, challenge_id };
   }
 
   async resolveChallenge(challenge_id: number, upheld: boolean): Promise<TxRecord> {
-    if (MODE === "chain") {
-      const { deployHash } = await runLivenetCmd([
-        "resolve_challenge",
-        challenge_id.toString(),
-        upheld.toString(),
-      ]);
-      const { syncAssetFromChain } = await import("./chainSync.ts");
-      const ch = this.challenges.get(challenge_id);
-      const assetId = ch ? ch.asset_id : "";
-      await syncAssetFromChain(assetId);
-      
-      const tx: TxRecord = {
-        action: "resolve_challenge",
-        deploy_hash: deployHash,
-        result: upheld ? "Verifier slashed" : "Challenger slashed",
-        timestamp: Date.now(),
-      };
-      this.txs.push(tx);
-      return tx;
-    }
-
+    assertChainMode();
+    const { deployHash } = await runLivenetCmd([
+      "resolve_challenge",
+      challenge_id.toString(),
+      upheld.toString(),
+    ]);
+    const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
     const ch = this.challenges.get(challenge_id);
-    if (!ch) throw new Error("ChallengeNotFound");
-    if (ch.status !== "Open") throw new Error("ChallengeAlreadyResolved");
-    ch.resolved_at = this.now();
-    if (upheld) {
-      ch.status = "Upheld";
-      const bad = this.mustAgent(ch.challenged_agent_id);
-      const slashed = bad.bonded_amount;
-      bad.bonded_amount = 0;
-      bad.slashed_count += 1;
-      bad.active = false;
-      bad.reputation = Math.max(0, bad.reputation - 50);
-      const good = this.mustAgent(ch.challenger_agent_id);
-      good.bonded_amount += slashed + ch.counter_bond;
-      good.reputation += 10;
-      good.successful_reports += 1;
-      good.total_reports += 1;
-      this.record("agent_slashed", { agent: ch.challenged_agent_id, amount: slashed }, `Slashed ${slashed}`);
-      const asset = this.assets.get(ch.asset_id);
-      if (asset) asset.current_score = 0;
-      this.freeze(ch.asset_id, "challenge upheld");
-    } else {
-      ch.status = "Rejected";
-      const challenger = this.mustAgent(ch.challenger_agent_id);
-      challenger.bonded_amount = Math.max(0, challenger.bonded_amount - ch.counter_bond);
-      challenger.total_reports += 1;
-      const verifier = this.mustAgent(ch.challenged_agent_id);
-      verifier.reputation += 5;
-      verifier.successful_reports += 1;
-    }
-    return this.record("resolve_challenge", { challenge_id, upheld }, upheld ? "Verifier slashed" : "Challenger slashed");
+    const assetId = ch ? ch.asset_id : "";
+    if (assetId) await syncAssetFromChain(assetId);
+
+    const tx: TxRecord = {
+      action: "resolve_challenge",
+      deploy_hash: deployHash,
+      result: upheld ? "Verifier slashed" : "Challenger slashed",
+      timestamp: Date.now(),
+    };
+    this.txs.push(tx);
+    persistTransaction(tx);
+    return tx;
   }
 
   async releaseBond(agent_id: string): Promise<TxRecord> {
-    const agent = this.mustAgent(agent_id);
-    agent.bonded_amount = 0;
-    agent.active = false;
-    return this.record("release_bond", { agent_id }, "Bond released");
+    assertChainMode();
+    const { deployHash } = await runLivenetCmd([
+      "release_bond",
+      agent_id,
+    ]);
+    const { persistTransaction } = await import("./chainSync.ts");
+    const agent = this.agents.get(agent_id);
+    if (agent) {
+      agent.bonded_amount = 0;
+      agent.active = false;
+    }
+    const tx: TxRecord = {
+      action: "release_bond",
+      deploy_hash: deployHash,
+      result: "Bond released",
+      timestamp: Date.now(),
+    };
+    this.txs.push(tx);
+    persistTransaction(tx);
+    return tx;
   }
 
   private mustAsset(id: string): Asset {
@@ -646,14 +542,15 @@ class WardensCoreSim {
   }
 }
 
-const sim = new WardensCoreSim();
-
-if (MODE === "chain") {
-  console.warn(
-    "[casperClient] WARDENS_MODE=chain: submitting via livenet CLI executor directly to the blockchain."
+const MODE = process.env.WARDENS_MODE;
+if (MODE !== "chain") {
+  console.error(
+    `[casperClient] FATAL: WARDENS_MODE="${MODE ?? "unset"}". ` +
+    `This backend requires WARDENS_MODE=chain — no simulation fallback exists. ` +
+    `Set the env variable and restart.`
   );
+  // Don't process.exit here — let the error surface on first API call so PM2 can log it cleanly.
 }
 
-export const casper = sim;
-export type CasperClient = WardensCoreSim;
-
+export const casper = new WardensChainClient();
+export type CasperClient = WardensChainClient;
