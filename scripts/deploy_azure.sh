@@ -67,6 +67,9 @@ module.exports = {
 };
 PM2EOF
 
+  echo "--> Resetting transaction cache to purge all legacy mocked/queued data..."
+  rm -f ~/wardens/backend/.local/transactions.json 2>/dev/null || true
+
   echo "--> Launching entire ecosystem in the background!"
   pm2 delete all 2>/dev/null || true
   sudo fuser -k 3000/tcp 2>/dev/null || true

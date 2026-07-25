@@ -73,13 +73,19 @@ export function replaceTransaction(
 function loadPersistedTransactions() {
   if (!existsSync(TXS_FILE)) return;
   try {
-    const txs: import("./casperClient.ts").TxRecord[] = JSON.parse(readFileSync(TXS_FILE, "utf8"));
+    const allTxs: import("./casperClient.ts").TxRecord[] = JSON.parse(readFileSync(TXS_FILE, "utf8"));
+    // Purge any placeholder/mocked queued hashes (starting with cspr- or non-64-hex) from disk
+    const txs = allTxs.filter((t) => t.deploy_hash && !t.deploy_hash.startsWith("cspr-") && /^[a-fA-F0-9]{64}$/.test(t.deploy_hash));
+    if (txs.length !== allTxs.length) {
+      writeFileSync(TXS_FILE, JSON.stringify(txs));
+      console.log(`[chainSync] Purged ${allTxs.length - txs.length} mocked/queued placeholders from disk storage.`);
+    }
     // Merge into casper.txs without duplicating existing entries
     const existingHashes = new Set(casper.txs.map((t) => t.deploy_hash));
     for (const tx of txs) {
       if (!existingHashes.has(tx.deploy_hash)) casper.txs.push(tx);
     }
-    console.log(`[chainSync] loaded ${txs.length} persisted transactions from disk.`);
+    console.log(`[chainSync] loaded ${txs.length} verified on-chain transactions from disk.`);
   } catch (e) {
     console.warn("[chainSync] could not load persisted transactions:", (e as Error).message);
   }

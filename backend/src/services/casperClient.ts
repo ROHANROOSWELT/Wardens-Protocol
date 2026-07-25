@@ -190,18 +190,22 @@ class WardensChainClient {
     evidence_hash: string;
   }): Promise<TxRecord> {
     assertChainMode();
-    const { syncAssetFromChain, trackAssetLocally, persistTransaction, replaceTransaction } = await import("./chainSync.ts");
+    const { syncAssetFromChain, trackAssetLocally, persistTransaction } = await import("./chainSync.ts");
     trackAssetLocally(a.asset_id);
 
-    const placeholderHash = "cspr-" + a.evidence_hash.substring(7, 39);
-    const queuedTx: TxRecord = {
-      action: "create_asset",
-      deploy_hash: placeholderHash,
-      result: `Asset ${a.asset_id} queued on-chain`,
-      timestamp: Date.now(),
-    };
+    // Submit synchronously to real Casper Testnet so ONLY genuine on-chain hashes are ever returned
+    const { deployHash } = await runLivenetCmd([
+      "create_asset",
+      a.asset_id,
+      a.issuer,
+      a.debtor,
+      a.face_value.toString(),
+      a.due_date.toString(),
+      a.evidence_hash,
+    ]);
+    console.log(`[casperClient] ✓ Asset ${a.asset_id} on-chain: ${deployHash}`);
+    await syncAssetFromChain(a.asset_id);
 
-    // Optimistically add to read model so UI can show it immediately
     const now = Date.now();
     this.assets.set(a.asset_id, {
       ...a,
@@ -210,40 +214,26 @@ class WardensChainClient {
       created_at: now,
       updated_at: now,
     });
-    this.txs.push(queuedTx);
-    persistTransaction(queuedTx);
 
-    // Submit to Casper Testnet — runs async, replaces placeholder when confirmed
-    runLivenetCmd([
-      "create_asset",
-      a.asset_id,
-      a.issuer,
-      a.debtor,
-      a.face_value.toString(),
-      a.due_date.toString(),
-      a.evidence_hash,
-    ]).then(async ({ deployHash }) => {
-      console.log(`[casperClient] ✓ Asset ${a.asset_id} on-chain: ${deployHash}`);
-      await syncAssetFromChain(a.asset_id);
-      const realTx: TxRecord = {
-        action: "create_asset",
-        deploy_hash: deployHash,
-        result: `Asset ${a.asset_id} created`,
-        timestamp: queuedTx.timestamp,
-      };
-      const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
-      if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
-      replaceTransaction(placeholderHash, realTx);
-    }).catch((e) => console.error(`[casperClient] createAsset on-chain error:`, e));
+    const realTx: TxRecord = {
+      action: "create_asset",
+      deploy_hash: deployHash,
+      result: `Asset ${a.asset_id} created`,
+      timestamp: now,
+    };
+    this.txs.push(realTx);
+    persistTransaction(realTx);
 
-    return queuedTx;
+    return realTx;
   }
 
   async registerAgent(agent_id: string, role: string): Promise<TxRecord> {
     assertChainMode();
-    const { persistTransaction, replaceTransaction } = await import("./chainSync.ts");
+    const { persistTransaction } = await import("./chainSync.ts");
 
-    // Optimistically seed into read model
+    const { deployHash } = await runLivenetCmd(["register_agent", agent_id, role.toLowerCase()]);
+    console.log(`[casperClient] ✓ Agent ${agent_id} registered on-chain: ${deployHash}`);
+
     this.agents.set(agent_id, {
       agent_id,
       role,
@@ -256,71 +246,41 @@ class WardensChainClient {
       x402_price: 1_000_000,
     });
 
-    const placeholderHash = `cspr-reg-${Date.now()}`;
-    const queuedTx: TxRecord = {
+    const realTx: TxRecord = {
       action: "register_agent",
-      deploy_hash: placeholderHash,
-      result: `Agent ${agent_id} queued on-chain`,
+      deploy_hash: deployHash,
+      result: `Agent ${agent_id} registered`,
       timestamp: Date.now(),
     };
-    this.txs.push(queuedTx);
-    persistTransaction(queuedTx);
+    this.txs.push(realTx);
+    persistTransaction(realTx);
 
-    runLivenetCmd(["register_agent", agent_id, role.toLowerCase()])
-      .then(async ({ deployHash }) => {
-        console.log(`[casperClient] ✓ Agent ${agent_id} registered on-chain: ${deployHash}`);
-        const realTx: TxRecord = {
-          action: "register_agent",
-          deploy_hash: deployHash,
-          result: `Agent ${agent_id} registered`,
-          timestamp: queuedTx.timestamp,
-        };
-        const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
-        if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
-        replaceTransaction(placeholderHash, realTx);
-      })
-      .catch((e) => console.error(`[casperClient] registerAgent on-chain error:`, e));
-
-    return queuedTx;
+    return realTx;
   }
 
   async postBond(agent_id: string, amount: number): Promise<TxRecord> {
     assertChainMode();
-    const { persistTransaction, replaceTransaction } = await import("./chainSync.ts");
+    const { persistTransaction } = await import("./chainSync.ts");
 
-    // Optimistically update read model
+    const { deployHash } = await runLivenetCmd(["post_bond", agent_id, amount.toString()]);
+    console.log(`[casperClient] ✓ Bond ${amount} posted for ${agent_id}: ${deployHash}`);
+
     const agent = this.agents.get(agent_id);
     if (agent) {
       agent.bonded_amount += amount;
       agent.active = true;
     }
 
-    const placeholderHash = `cspr-bond-${Date.now()}`;
-    const queuedTx: TxRecord = {
+    const realTx: TxRecord = {
       action: "post_bond",
-      deploy_hash: placeholderHash,
-      result: `Bond ${amount} queued on-chain`,
+      deploy_hash: deployHash,
+      result: `Bond ${amount} locked`,
       timestamp: Date.now(),
     };
-    this.txs.push(queuedTx);
-    persistTransaction(queuedTx);
+    this.txs.push(realTx);
+    persistTransaction(realTx);
 
-    runLivenetCmd(["post_bond", agent_id, amount.toString()])
-      .then(async ({ deployHash }) => {
-        console.log(`[casperClient] ✓ Bond ${amount} posted for ${agent_id}: ${deployHash}`);
-        const realTx: TxRecord = {
-          action: "post_bond",
-          deploy_hash: deployHash,
-          result: `Bond ${amount} locked`,
-          timestamp: queuedTx.timestamp,
-        };
-        const memIdx = this.txs.findIndex((t) => t.deploy_hash === placeholderHash);
-        if (memIdx >= 0) this.txs[memIdx] = realTx; else this.txs.push(realTx);
-        replaceTransaction(placeholderHash, realTx);
-      })
-      .catch((e) => console.error(`[casperClient] postBond on-chain error:`, e));
-
-    return queuedTx;
+    return realTx;
   }
 
   async submitScore(s: {
