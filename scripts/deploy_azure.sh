@@ -62,13 +62,16 @@ module.exports = {
     { name: 'parser',   script: BUN, args: 'src/index.ts', cwd: './agents/parser-agent',  env: ENV },
     { name: 'fraud',    script: BUN, args: 'src/index.ts', cwd: './agents/fraud-agent',   env: ENV },
     { name: 'registry', script: BUN, args: 'src/index.ts', cwd: './agents/registry-agent',env: ENV },
-    { name: 'dashboard', script: BUN, args: 'run start', cwd: './dashboard', interpreter: 'none', env: { ...ENV, PORT: '3000' } },
+    { name: 'dashboard', script: './node_modules/next/dist/bin/next', args: 'start -p 3000', cwd: './dashboard', interpreter: 'node', env: { ...ENV, PORT: '3000' } },
   ]
 };
 PM2EOF
 
   echo "--> Launching entire ecosystem in the background!"
-  pm2 startOrRestart ecosystem.config.js
+  pm2 delete all 2>/dev/null || true
+  sudo fuser -k 3000/tcp 2>/dev/null || true
+  sudo fuser -k 4000/tcp 2>/dev/null || true
+  pm2 start ecosystem.config.js
   pm2 save
 EOF
 
