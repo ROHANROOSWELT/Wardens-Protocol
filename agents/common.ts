@@ -53,7 +53,7 @@ export function serveVerifier(cfg: VerifierConfig): void {
       // settled here; for the Qualification Round we validate the header shape
       // and issue a real receipt hash bound to the payment + result.
       const body = await req.json().catch(() => ({}));
-      const result = cfg.verify(body);
+      const result = await cfg.verify(body);
       const evidence_hash = canonicalizeAndHash(result);
       const x402_receipt =
         "rcpt:" +
