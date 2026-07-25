@@ -21,7 +21,7 @@
   <a href="http://20.6.128.197">🚀 Live App (Azure)</a> •
   <a href="https://wardens-protocol.vercel.app">🌍 Vercel Mirror</a> •
   <a href="https://github.com/ROHANROOSWELT/Wardens-Protocol/blob/main/PROOF.md">📜 Testnet Proof</a> •
-  <a href="https://www.youtube.com/watch?v=XzGEAL43tB4">🎥 Demo Video</a>
+  <a href="https://youtu.be/BSXk7wKs37o">🎥 Demo Video</a>
 </div>
 
 ---
