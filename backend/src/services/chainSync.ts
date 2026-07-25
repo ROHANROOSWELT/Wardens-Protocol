@@ -219,7 +219,7 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
       ODRA_CASPER_LIVENET_NODE_ADDRESS: process.env.ODRA_CASPER_LIVENET_NODE_ADDRESS || process.env.CASPER_NODE_URL || "https://node.testnet.casper.network/rpc",
       ODRA_CASPER_LIVENET_CHAIN_NAME: process.env.ODRA_CASPER_LIVENET_CHAIN_NAME || process.env.CASPER_CHAIN_NAME || "casper-test",
       ODRA_CASPER_LIVENET_SECRET_KEY_PATH: resolveSecretKeyPath(),
-      ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "http://node.testnet.casper.network:9999/events/main",
+      ODRA_CASPER_LIVENET_EVENTS_URL: process.env.ODRA_CASPER_LIVENET_EVENTS_URL || process.env.CASPER_EVENT_STREAM_URL || "http://135.181.17.229:9999/events",
     };
     const child = spawn(bin, ["dump", assetId], {
       cwd: CONTRACT_DIR,
