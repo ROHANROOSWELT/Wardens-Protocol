@@ -189,6 +189,9 @@ This creates a **real economic cost** for verification — preventing spam, alig
 
 ## ✅ On-Chain Proof
 
+**Deployer Account Hash:** `account-hash-193e9cd5cfbb21cbbd393028b5083c7bc8671d8cbf8055e5f1a0c2ddd92e65ca`  
+*(Public Key Hex: `01d3f57446277a2e445d58346ec2a8fcac1a971afd26c4a94444e44e349c891580`)*
+
 These are real `create_asset` transactions submitted live to the Casper Testnet from the Azure backend:
 
 | Asset | Transaction Hash |
