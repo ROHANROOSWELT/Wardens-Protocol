@@ -173,7 +173,7 @@ This creates a **real economic cost** for verification — preventing spam, alig
 
 | Module | Casper Testnet Contract Package |
 | :--- | :--- |
-| **WardensCore (Phase 1)** | [`contract-package-ef137b...`](https://testnet.cspr.live/contract-package/ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de) |
+| **WardensCore (Phase 1)** | [`contract-package-b93d38...`](https://testnet.cspr.live/contract-package/b93d38aa5cacb4b9ecae17ebb7364b906abba449bda9396775e2f674a1fa3c2f) |
 | **AssetRegistry** | [`contract-package-8c6e8f...`](https://testnet.cspr.live/contract-package/8c6e8f1c799d4abc596973d612492e5b5b03643247d0af27a0db363f7e360320) |
 | **ScoreRegistry** | [`contract-package-3afb41...`](https://testnet.cspr.live/contract-package/3afb414e8f2f2e2c1db569945dc34fa6705bb5efa3c945c7d37856bff7682590) |
 | **BondVault** | [`contract-package-249f59...`](https://testnet.cspr.live/contract-package/249f599014a2167dab598362451b4c7b591884b7a9e5f3e65f4f31a5e4783f38) |
