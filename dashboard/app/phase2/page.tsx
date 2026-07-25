@@ -1,9 +1,8 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { post, getChainInfo, explorerLink } from "../../lib/api";
+import { post, getChainInfo, explorerLink, BACKEND } from "../../lib/api";
 
-const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL ?? "http://localhost:4000";
 
 async function getJson<T>(path: string, fb: T): Promise<T> {
   try {
