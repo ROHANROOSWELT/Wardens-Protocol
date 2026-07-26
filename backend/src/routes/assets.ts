@@ -1,11 +1,34 @@
 import { Router } from "express";
 import { casper } from "../services/casperClient.ts";
 import { canonicalizeAndHash } from "../services/evidenceHasher.ts";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+const CACHE_DIR = `${ROOT}/backend/.local`;
+const OFFCHAIN_FILE = `${CACHE_DIR}/offchain_data.json`;
 
 export const assetsRouter = Router();
 
 // In-memory store for off-chain RWA metadata (simulating IPFS or a secure data vault)
 export const offchainData = new Map<string, { invoice_number: string, invoice_file_content: string }>();
+
+function loadOffchain() {
+  if (existsSync(OFFCHAIN_FILE)) {
+    try {
+      const data = JSON.parse(readFileSync(OFFCHAIN_FILE, "utf8"));
+      for (const [k, v] of Object.entries(data)) {
+        offchainData.set(k, v as any);
+      }
+    } catch {}
+  }
+}
+loadOffchain();
+
+function saveOffchain() {
+  if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+  writeFileSync(OFFCHAIN_FILE, JSON.stringify(Object.fromEntries(offchainData)));
+}
 
 // POST /api/assets — hash invoice data, create the asset on Casper.
 assetsRouter.post("/", async (req, res) => {
@@ -42,6 +65,7 @@ assetsRouter.post("/", async (req, res) => {
       invoice_number: invoice_number || asset_id,
       invoice_file_content: invoice_file_content || "{}"
     });
+    saveOffchain();
 
     casper.createAsset({
       asset_id,
