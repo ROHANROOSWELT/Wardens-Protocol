@@ -90,40 +90,45 @@ export default function ControlRoom() {
   };
   const verify = () => run("verify", async () => {
     if (!asset) return note("✗ no asset selected");
+    setPendingAction("Verify (x402)");
     await ensureAgents();
     const r = await post("/api/verify", { asset_id: asset });
-    if (r.ok) { setPendingAction("Verify (x402)"); setTimeout(() => setPendingAction(null), 30000); }
+    if (r.ok) { setTimeout(() => setPendingAction(null), 30000); } else { setPendingAction(null); }
     note(r.ok ? `✓ Verify queued in background` : `✗ ${r.data.error}`);
   });
   const borrow = () => run("borrow", async () => {
     if (!asset) return note("✗ no asset selected");
+    setPendingAction("Deposit + borrow");
     const currentAsset = assets.find((a) => a.asset_id === asset);
     const fv = currentAsset ? currentAsset.face_value : 0;
-    if (fv <= 0) return note("✗ invalid face value");
+    if (fv <= 0) { setPendingAction(null); return note("✗ invalid face value"); }
     await post("/api/vault/deposit", { asset_id: asset, collateral_value: fv });
     const amt = Math.floor(fv * 0.7);
     const r = await post("/api/vault/borrow", { asset_id: asset, amount: amt });
-    if (r.ok) { setPendingAction("Deposit + borrow"); setTimeout(() => setPendingAction(null), 30000); }
+    if (r.ok) { setTimeout(() => setPendingAction(null), 30000); } else { setPendingAction(null); }
     note(r.ok ? `✓ Borrow queued in background` : `✗ ${r.data.error}`);
   });
   const lying = () => run("lying score", async () => {
     if (!asset) return note("✗ no asset selected");
+    setPendingAction("Post dishonest score");
     await ensureAgents();
     const r = await post("/api/verify/manual", { asset_id: asset, score: 90 });
-    if (r.ok) { setPendingAction("Post dishonest score"); setTimeout(() => setPendingAction(null), 30000); }
+    if (r.ok) { setTimeout(() => setPendingAction(null), 30000); } else { setPendingAction(null); }
     note(r.ok ? `✓ Dishonest score queued` : `✗ ${r.data.error}`);
   });
   const challenge = () => run("challenge", async () => {
     if (!sel?.last_score_id) return note("✗ no score to challenge");
+    setPendingAction("Open challenge");
     const r = await post("/api/challenge/open", { score_id: sel.last_score_id, challenger_agent_id: "challenger-agent-1", reason: "Independent recheck: invoice already paid" });
-    if (r.ok) { setPendingAction("Open challenge"); setTimeout(() => setPendingAction(null), 30000); }
+    if (r.ok) { setTimeout(() => setPendingAction(null), 30000); } else { setPendingAction(null); }
     note(r.ok ? `✓ Challenge queued` : `✗ ${r.data.error}`);
   });
   const resolve = () => run("resolve", async () => {
     const open = (sel?.challenges ?? []).find((c: any) => c.status === "Open");
     if (!open) return note("✗ no open challenge");
+    setPendingAction("Resolve: slash");
     const r = await post("/api/challenge/resolve", { challenge_id: open.challenge_id, upheld: true });
-    if (r.ok) { setPendingAction("Resolve: slash"); setTimeout(() => setPendingAction(null), 30000); }
+    if (r.ok) { setTimeout(() => setPendingAction(null), 30000); } else { setPendingAction(null); }
     note(r.ok ? `✓ Resolve queued` : `✗ ${r.data.error}`);
   });
   const sync = () => {
