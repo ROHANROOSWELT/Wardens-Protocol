@@ -13,9 +13,9 @@ import { casper } from "../services/casperClient.ts";
 import { canonicalizeAndHash } from "../services/evidenceHasher.ts";
 import { x402Post } from "../services/x402Client.ts";
 import { setExplanation, addReceipt, setLastScoreId } from "../services/store.ts";
-import { computeScore } from "../services/scoreEngine.ts";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 
@@ -111,7 +111,7 @@ phase2Router.post("/arbitration/vote", async (req, res) => {
     // For Phase 2 demo the backend tracks votes and auto-resolves at threshold.
     const challenge = casper.challenges.get(Number(challenge_id));
     if (!challenge) return res.status(404).json({ error: "ChallengeNotFound" });
-    if (challenge.status !== "Open" && challenge.status !== "InArbitration") {
+    if (challenge.status !== "Open" && (challenge.status as string) !== "InArbitration") {
       return res.status(400).json({ error: "ChallengeAlreadyResolved" });
     }
 

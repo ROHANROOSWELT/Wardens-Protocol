@@ -198,7 +198,7 @@ function applyChainData(d: DumpData): void {
     const agent: Agent = {
       agent_id: ag.agent_id, role: ag.role, bonded_amount: Number(ag.bonded_amount),
       reputation: ag.reputation, total_reports: ag.total_reports,
-      successful_reports: ag.successful_reports, slashed_count: ag.slashed_count, active: ag.active,
+      successful_reports: ag.successful_reports, slashed_count: ag.slashed_count, active: ag.active, x402_price: 1_000_000,
     };
     casper.agents.set(ag.agent_id, agent);
   }
