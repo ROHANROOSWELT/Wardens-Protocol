@@ -9,9 +9,9 @@ import type { VerifierResult } from "../services/scoreEngine.ts";
 
 export const verifyRouter = Router();
 
-const PARSER = process.env.PARSER_AGENT_URL ?? "http://localhost:4101";
-const FRAUD = process.env.FRAUD_AGENT_URL ?? "http://localhost:4102";
-const REGISTRY = process.env.REGISTRY_AGENT_URL ?? "http://localhost:4103";
+const PARSER = process.env.PARSER_AGENT_URL ?? "http://127.0.0.1:4101";
+const FRAUD = process.env.FRAUD_AGENT_URL ?? "http://127.0.0.1:4102";
+const REGISTRY = process.env.REGISTRY_AGENT_URL ?? "http://127.0.0.1:4103";
 
 
 // Deterministic fallback explanation (Section 0 rule 2 / Step C): built from
