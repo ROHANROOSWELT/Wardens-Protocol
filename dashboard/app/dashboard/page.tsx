@@ -224,13 +224,15 @@ export default function ControlRoom() {
           )}
         </div>
         
-        {/* Processing Banner */}
+        {/* Processing Banner (Drawer Animation) */}
         {(pendingAction || txs.some(t => !t.confirmed)) && (
-          <div className="neo-border bg-primary-container text-on-primary p-md neo-shadow animate-in fade-in">
-            <p className="text-body-lg font-bold mb-xs">Transaction queued: {pendingAction || "Processing"}</p>
-            <div className="flex items-center gap-xs mt-xs">
-              <span className="inline-block w-3 h-3 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-label-md">Wait until the transaction appears confirmed in the timeline...</span>
+          <div className="border-[3px] border-on-surface bg-surface-container-highest p-md neobrutalist-shadow animate-in fade-in slide-in-from-top-4 mb-sm duration-300">
+            <p className="text-label-md uppercase font-bold tracking-widest mb-xs text-on-surface">
+              <span className="bg-on-surface text-surface px-xs py-base mr-xs">QUEUED</span> {pendingAction || "Blockchain Processing"}
+            </p>
+            <div className="flex items-center gap-sm mt-sm">
+              <span className="inline-block w-4 h-4 border-[3px] border-on-surface border-t-transparent rounded-full animate-spin" />
+              <span className="text-label-md uppercase text-on-surface-variant tracking-widest">Wait until the transaction appears confirmed in the timeline...</span>
             </div>
           </div>
         )}
