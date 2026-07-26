@@ -22,6 +22,8 @@ export default function ControlRoom() {
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [showBorrowInput, setShowBorrowInput] = useState(false);
+  const [borrowAmount, setBorrowAmount] = useState("");
 
   const pathD = useMemo(() => {
     const points = txs
@@ -96,17 +98,21 @@ export default function ControlRoom() {
     if (r.ok) { setTimeout(() => setPendingAction(null), 30000); } else { setPendingAction(null); }
     note(r.ok ? `✓ Verify queued in background` : `✗ ${r.data.error}`);
   });
-  const borrow = () => run("borrow", async () => {
+  const confirmBorrow = () => run("borrow", async () => {
     if (!asset) return note("✗ no asset selected");
+    const amt = parseInt(borrowAmount, 10);
+    if (isNaN(amt) || amt <= 0) return note("✗ invalid borrow amount");
+
     setPendingAction("Deposit + borrow");
     const currentAsset = assets.find((a) => a.asset_id === asset);
     const fv = currentAsset ? currentAsset.face_value : 0;
     if (fv <= 0) { setPendingAction(null); return note("✗ invalid face value"); }
     await post("/api/vault/deposit", { asset_id: asset, collateral_value: fv });
-    const amt = Math.floor(fv * 0.7);
     const r = await post("/api/vault/borrow", { asset_id: asset, amount: amt });
     if (r.ok) { setTimeout(() => setPendingAction(null), 30000); } else { setPendingAction(null); }
     note(r.ok ? `✓ Borrow queued in background` : `✗ ${r.data.error}`);
+    setShowBorrowInput(false);
+    setBorrowAmount("");
   });
   const lying = () => run("lying score", async () => {
     if (!asset) return note("✗ no asset selected");
@@ -249,7 +255,21 @@ export default function ControlRoom() {
         ) : (
           <div className="flex flex-wrap gap-sm">
             <ActBtn onClick={verify} busy={busy} primary>1 · Verify (x402)</ActBtn>
-            <ActBtn onClick={borrow} busy={busy}>2 · Deposit + borrow</ActBtn>
+            {!showBorrowInput ? (
+              <ActBtn onClick={() => setShowBorrowInput(true)} busy={busy}>2 · Deposit + borrow</ActBtn>
+            ) : (
+              <div className="flex items-center gap-xs">
+                <input 
+                  type="number" 
+                  value={borrowAmount} 
+                  onChange={(e) => setBorrowAmount(e.target.value)} 
+                  placeholder="Amount" 
+                  className="border-[3px] border-on-surface bg-surface px-sm py-xs text-label-md font-mono-plex w-24 outline-none focus:bg-surface-container-highest"
+                />
+                <ActBtn onClick={confirmBorrow} busy={busy} primary>Confirm</ActBtn>
+                <ActBtn onClick={() => { setShowBorrowInput(false); setBorrowAmount(""); }} busy={busy}>Cancel</ActBtn>
+              </div>
+            )}
             <ActBtn onClick={lying} busy={busy}>Post dishonest score</ActBtn>
             <ActBtn onClick={challenge} busy={busy}>Open challenge</ActBtn>
             <ActBtn onClick={resolve} busy={busy}>Resolve: slash</ActBtn>
