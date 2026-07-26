@@ -90,7 +90,10 @@ verifyRouter.post("/", async (req, res) => {
         const fraudCall = await x402Post<VerifierResult>(`${FRAUD}/verify/fraud`, {
           asset_id,
           invoice_number: asset_id,
-          amount: assetData.face_value,
+          issuer: assetData.issuer,
+          debtor: assetData.debtor,
+          face_value: assetData.face_value,
+          due_date: assetData.due_date,
         });
         const registryCall = await x402Post<VerifierResult>(`${REGISTRY}/verify/registry`, {
           issuer: assetData.issuer,
