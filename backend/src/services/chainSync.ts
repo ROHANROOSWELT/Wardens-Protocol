@@ -151,9 +151,9 @@ interface DumpData {
   }>;
 }
 
-function applyChainData(d: DumpData): void {
+function applyChainData(d: DumpData, requestedAssetId: string): void {
   const now = Date.now();
-  if (d.asset) {
+  if (d.asset && requestedAssetId) {
     const a = d.asset;
     
     // FILTER OUT LEGACY ASSETS FOR A CLEAN DASHBOARD
@@ -260,7 +260,7 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
       const line = out.split("\n").find((l) => l.startsWith("DUMP "));
       if (line && line.trim().endsWith("}")) {
         try {
-          applyChainData(JSON.parse(line.slice("DUMP ".length)) as DumpData);
+          applyChainData(JSON.parse(line.slice("DUMP ".length)) as DumpData, assetId);
           if (assetId) trackAssetLocally(assetId);
           finish({ ok: true });
         } catch {}
@@ -275,7 +275,7 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
       const line = out.split("\n").find((l) => l.startsWith("DUMP "));
       if (!line) return finish({ ok: false, error: `no chain data (exit ${code}). ${err.slice(-400)}` });
       try {
-        applyChainData(JSON.parse(line.slice("DUMP ".length)) as DumpData);
+        applyChainData(JSON.parse(line.slice("DUMP ".length)) as DumpData, assetId);
         if (assetId) trackAssetLocally(assetId);
         finish({ ok: true });
       } catch (e) {
