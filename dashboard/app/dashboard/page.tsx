@@ -21,6 +21,7 @@ export default function ControlRoom() {
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const pathD = useMemo(() => {
     const points = txs
@@ -91,7 +92,8 @@ export default function ControlRoom() {
     if (!asset) return note("✗ no asset selected");
     await ensureAgents();
     const r = await post("/api/verify", { asset_id: asset });
-    note(r.ok ? `✓ verified ${asset} → score ${r.data.final_score}` : `✗ ${r.data.error}`);
+    if (r.ok) { setPendingAction("Verify (x402)"); setTimeout(() => setPendingAction(null), 5000); }
+    note(r.ok ? `✓ Verify queued in background` : `✗ ${r.data.error}`);
   });
   const borrow = () => run("borrow", async () => {
     if (!asset) return note("✗ no asset selected");
@@ -101,24 +103,28 @@ export default function ControlRoom() {
     await post("/api/vault/deposit", { asset_id: asset, collateral_value: fv });
     const amt = Math.floor(fv * 0.7);
     const r = await post("/api/vault/borrow", { asset_id: asset, amount: amt });
-    note(r.ok ? `✓ borrowed ${amt}` : `✗ ${r.data.error}`);
+    if (r.ok) { setPendingAction("Deposit + borrow"); setTimeout(() => setPendingAction(null), 5000); }
+    note(r.ok ? `✓ Borrow queued in background` : `✗ ${r.data.error}`);
   });
   const lying = () => run("lying score", async () => {
     if (!asset) return note("✗ no asset selected");
     await ensureAgents();
     const r = await post("/api/verify/manual", { asset_id: asset, score: 90 });
-    note(r.ok ? `✓ dishonest 90 posted on ${asset}` : `✗ ${r.data.error}`);
+    if (r.ok) { setPendingAction("Post dishonest score"); setTimeout(() => setPendingAction(null), 5000); }
+    note(r.ok ? `✓ Dishonest score queued` : `✗ ${r.data.error}`);
   });
   const challenge = () => run("challenge", async () => {
     if (!sel?.last_score_id) return note("✗ no score to challenge");
     const r = await post("/api/challenge/open", { score_id: sel.last_score_id, challenger_agent_id: "challenger-agent-1", reason: "Independent recheck: invoice already paid" });
-    note(r.ok ? `✓ challenge #${r.data.challenge_id} opened` : `✗ ${r.data.error}`);
+    if (r.ok) { setPendingAction("Open challenge"); setTimeout(() => setPendingAction(null), 5000); }
+    note(r.ok ? `✓ Challenge queued` : `✗ ${r.data.error}`);
   });
   const resolve = () => run("resolve", async () => {
     const open = (sel?.challenges ?? []).find((c: any) => c.status === "Open");
     if (!open) return note("✗ no open challenge");
     const r = await post("/api/challenge/resolve", { challenge_id: open.challenge_id, upheld: true });
-    note(r.ok ? `✓ challenge #${open.challenge_id} upheld — verifier slashed` : `✗ ${r.data.error}`);
+    if (r.ok) { setPendingAction("Resolve: slash"); setTimeout(() => setPendingAction(null), 5000); }
+    note(r.ok ? `✓ Resolve queued` : `✗ ${r.data.error}`);
   });
   const sync = () => {
     setSyncing(true);
@@ -217,6 +223,18 @@ export default function ControlRoom() {
             <span className="text-on-surface-variant text-label-md uppercase">No assets yet</span>
           )}
         </div>
+        
+        {/* Processing Banner */}
+        {(pendingAction || txs.some(t => !t.confirmed)) && (
+          <div className="neo-border bg-primary-container text-on-primary p-md neo-shadow animate-in fade-in">
+            <p className="text-body-lg font-bold mb-xs">Transaction queued: {pendingAction || "Processing"}</p>
+            <div className="flex items-center gap-xs mt-xs">
+              <span className="inline-block w-3 h-3 border-2 border-on-primary border-t-transparent rounded-full animate-spin" />
+              <span className="text-label-md">Wait until the transaction appears confirmed in the timeline...</span>
+            </div>
+          </div>
+        )}
+
         {assets.length === 0 ? (
           <div className="text-body-md text-on-surface-variant">
             No assets yet, create one from <Link href="/vault" className="underline font-bold">Vault Registry</Link>.

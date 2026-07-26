@@ -50,13 +50,21 @@ verifyRouter.post("/manual", async (req, res) => {
     const { asset_id, score, agent_id = "aggregator-agent-1" } = req.body ?? {};
     if (asset_id === undefined || score === undefined)
       return res.status(400).json({ error: "asset_id and score required" });
-    const evidence_hash = canonicalizeAndHash({ asset_id, score, manual: true });
-    const explanation = `Verifier posted score ${score}.`;
-    const explanation_hash = canonicalizeAndHash({ explanation });
-    setExplanation(asset_id, explanation);
-    const tx = await casper.submitScore({ asset_id, score: Number(score), agent_id, evidence_hash, explanation_hash });
-    setLastScoreId(asset_id, tx.score_id);
-    res.json({ asset_id, score: Number(score), score_id: tx.score_id, tx_hash: tx.deploy_hash });
+      
+    (async () => {
+      try {
+        const evidence_hash = canonicalizeAndHash({ asset_id, score, manual: true });
+        const explanation = `Verifier posted score ${score}.`;
+        const explanation_hash = canonicalizeAndHash({ explanation });
+        setExplanation(asset_id, explanation);
+        const tx = await casper.submitScore({ asset_id, score: Number(score), agent_id, evidence_hash, explanation_hash });
+        setLastScoreId(asset_id, tx.score_id);
+      } catch (e) {
+        console.error(`[verify manual] error:`, e);
+      }
+    })();
+    
+    res.json({ status: "processing", asset_id, score: Number(score) });
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });
   }
@@ -71,84 +79,76 @@ verifyRouter.post("/", async (req, res) => {
   if (!assetData) return res.status(404).json({ error: "asset not found on chain" });
 
   try {
-    // Three x402-paid verifier calls (Section 8).
-    const parserCall = await x402Post<VerifierResult>(`${PARSER}/verify/parse`, {
-      asset_id,
-      amount: assetData.face_value,
-      due_date: assetData.due_date,
-    });
-    const fraudCall = await x402Post<VerifierResult>(`${FRAUD}/verify/fraud`, {
-      asset_id,
-      invoice_number: asset_id,
-      amount: assetData.face_value,
-    });
-    const registryCall = await x402Post<VerifierResult>(`${REGISTRY}/verify/registry`, {
-      issuer: assetData.issuer,
-      debtor: assetData.debtor,
-    });
+    (async () => {
+      try {
+        // Three x402-paid verifier calls (Section 8).
+        const parserCall = await x402Post<VerifierResult>(`${PARSER}/verify/parse`, {
+          asset_id,
+          amount: assetData.face_value,
+          due_date: assetData.due_date,
+        });
+        const fraudCall = await x402Post<VerifierResult>(`${FRAUD}/verify/fraud`, {
+          asset_id,
+          invoice_number: asset_id,
+          amount: assetData.face_value,
+        });
+        const registryCall = await x402Post<VerifierResult>(`${REGISTRY}/verify/registry`, {
+          issuer: assetData.issuer,
+          debtor: assetData.debtor,
+        });
 
-    const now = Date.now();
-    for (const [call, name] of [
-      [parserCall, "parser-agent"],
-      [fraudCall, "fraud-agent"],
-      [registryCall, "registry-agent"],
-    ] as const) {
-      addReceipt({
-        asset_id,
-        verifier_agent: name,
-        receipt: call.receipt,
-        amount: call.amount,
-        paid: call.paid,
-        status402Seen: call.status402Seen,
-        timestamp: now,
-      });
-    }
+        const now = Date.now();
+        for (const [call, name] of [
+          [parserCall, "parser-agent"],
+          [fraudCall, "fraud-agent"],
+          [registryCall, "registry-agent"],
+        ] as const) {
+          addReceipt({
+            asset_id,
+            verifier_agent: name,
+            receipt: call.receipt,
+            amount: call.amount,
+            paid: call.paid,
+            status402Seen: call.status402Seen,
+            timestamp: now,
+          });
+        }
 
-    const results = [parserCall.data, fraudCall.data, registryCall.data];
-    const final_score = aggregateScore({
-      parser: parserCall.data.score,
-      fraud: fraudCall.data.score,
-      registry: registryCall.data.score,
-    });
-    // evidence_hash commits to the DETERMINISTIC verifier outputs only (exclude the
-    // LLM explanation) so it's reproducible and a challenger can recompute it.
-    const deterministic = results.map((r) => ({
-      agent: r.agent,
-      valid: r.valid,
-      score: r.score,
-      findings: r.findings,
-      evidence_hash: r.evidence_hash,
-    }));
-    const evidence_hash = canonicalizeAndHash({ asset_id, results: deterministic });
-    const explanation = await aggregateExplanation(asset_id, final_score, results);
-    const explanation_hash = canonicalizeAndHash({ explanation });
-    setExplanation(asset_id, explanation);
+        const results = [parserCall.data, fraudCall.data, registryCall.data];
+        const final_score = aggregateScore({
+          parser: parserCall.data.score,
+          fraud: fraudCall.data.score,
+          registry: registryCall.data.score,
+        });
+        const deterministic = results.map((r) => ({
+          agent: r.agent,
+          valid: r.valid,
+          score: r.score,
+          findings: r.findings,
+          evidence_hash: r.evidence_hash,
+        }));
+        const evidence_hash = canonicalizeAndHash({ asset_id, results: deterministic });
+        const explanation = await aggregateExplanation(asset_id, final_score, results);
+        const explanation_hash = canonicalizeAndHash({ explanation });
+        setExplanation(asset_id, explanation);
 
-    const tx = await casper.submitScore({
-      asset_id,
-      score: final_score,
-      agent_id,
-      evidence_hash,
-      explanation_hash,
-    });
-    setLastScoreId(asset_id, tx.score_id);
+        const tx = await casper.submitScore({
+          asset_id,
+          score: final_score,
+          agent_id,
+          evidence_hash,
+          explanation_hash,
+        });
+        setLastScoreId(asset_id, tx.score_id);
+      } catch (e) {
+        console.error(`[verify] error for ${asset_id}:`, e);
+      }
+    })();
 
-    res.json({
-      asset_id,
-      final_score,
-      score_id: tx.score_id,
-      explanation,
-      evidence_hash,
-      tx_hash: tx.deploy_hash,
-      verifiers: {
-        parser: { ...parserCall.data, x402_receipt: parserCall.receipt },
-        fraud: { ...fraudCall.data, x402_receipt: fraudCall.receipt },
-        registry: { ...registryCall.data, x402_receipt: registryCall.receipt },
-      },
-    });
+    res.json({ status: "processing", asset_id });
   } catch (e) {
     res.status(502).json({
-      error: `verification failed: ${(e as Error).message}. Are the agent services running (scripts/seed_demo.sh / run_verification.sh)?`,
+      error: `verification failed: ${(e as Error).message}`,
     });
   }
 });

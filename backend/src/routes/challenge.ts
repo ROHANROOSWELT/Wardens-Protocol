@@ -16,13 +16,15 @@ challengeRouter.post("/open", async (req, res) => {
     } = req.body ?? {};
     if (score_id === undefined) return res.status(400).json({ error: "score_id required" });
     const counter_evidence_hash = canonicalizeAndHash({ score_id, reason });
-    const tx = await casper.openChallenge({
+    
+    casper.openChallenge({
       score_id: Number(score_id),
       challenger_agent_id,
       counter_evidence_hash,
       counter_bond: Number(counter_bond),
-    });
-    res.json({ deploy_hash: tx.deploy_hash, challenge_id: tx.challenge_id, reason, counter_evidence_hash });
+    }).catch(e => console.error(`[challenge] open error:`, e));
+    
+    res.json({ status: "processing", reason, counter_evidence_hash });
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });
   }
@@ -33,8 +35,11 @@ challengeRouter.post("/resolve", async (req, res) => {
   try {
     const { challenge_id, upheld } = req.body ?? {};
     if (challenge_id === undefined) return res.status(400).json({ error: "challenge_id required" });
-    const tx = await casper.resolveChallenge(Number(challenge_id), Boolean(upheld));
-    res.json({ deploy_hash: tx.deploy_hash, challenge_id: Number(challenge_id), upheld: Boolean(upheld) });
+    
+    casper.resolveChallenge(Number(challenge_id), Boolean(upheld))
+      .catch(e => console.error(`[challenge] resolve error:`, e));
+      
+    res.json({ status: "processing", challenge_id: Number(challenge_id), upheld: Boolean(upheld) });
   } catch (e) {
     res.status(400).json({ error: (e as Error).message });
   }
