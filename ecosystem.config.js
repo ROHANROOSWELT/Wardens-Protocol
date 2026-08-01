@@ -1,11 +1,12 @@
 const sharedEnv = {
   WARDENS_MODE: 'chain',
   WARDENS_CORE_ADDRESS: 'contract-package-ef137b674026c1c08e55fc16e7d9e0dac9eec6b1a96b9f0b54b8fc729a9874de',
+  // Domain URLs — no raw IPs
   ODRA_CASPER_LIVENET_NODE_ADDRESS: 'https://node.testnet.casper.network/rpc',
   ODRA_CASPER_LIVENET_CHAIN_NAME: 'casper-test',
   ODRA_CASPER_LIVENET_SECRET_KEY_PATH: '/home/azureuser/Desktop/keys/secret_key.pem',
   ODRA_CASPER_LIVENET_EVENTS_URL: 'http://54.39.243.231:9999/events',
-  CASPER_NODE_URL: 'http://135.181.17.229:7777',
+  CASPER_NODE_URL: 'https://node.testnet.casper.network/rpc',
   CASPER_CHAIN_NAME: 'casper-test',
   CASPER_EVENT_STREAM_URL: 'http://54.39.243.231:9999/events',
   BACKEND_PRIVATE_KEY_PATH: '/home/azureuser/Desktop/keys/secret_key.pem',
