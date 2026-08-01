@@ -22,7 +22,7 @@ source ~/.cargo/env
 export ODRA_CASPER_LIVENET_NODE_ADDRESS=https://node.testnet.casper.network/rpc
 export ODRA_CASPER_LIVENET_CHAIN_NAME=casper-test
 export ODRA_CASPER_LIVENET_SECRET_KEY_PATH=/home/azureuser/Desktop/keys/secret_key.pem
-export ODRA_CASPER_LIVENET_EVENTS_URL=https://node.testnet.casper.network/events/main
+export ODRA_CASPER_LIVENET_EVENTS_URL=https://node.testnet.casper.network/events
 
 # Run the FULL demo sequence sequentially
 nohup bash -c '

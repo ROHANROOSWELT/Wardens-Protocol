@@ -5,10 +5,10 @@ const sharedEnv = {
   ODRA_CASPER_LIVENET_NODE_ADDRESS: 'https://node.testnet.casper.network/rpc',
   ODRA_CASPER_LIVENET_CHAIN_NAME: 'casper-test',
   ODRA_CASPER_LIVENET_SECRET_KEY_PATH: '/home/azureuser/Desktop/keys/secret_key.pem',
-  ODRA_CASPER_LIVENET_EVENTS_URL: 'https://node.testnet.casper.network/events/main',
+  ODRA_CASPER_LIVENET_EVENTS_URL: 'https://node.testnet.casper.network/events',
   CASPER_NODE_URL: 'https://node.testnet.casper.network/rpc',
   CASPER_CHAIN_NAME: 'casper-test',
-  CASPER_EVENT_STREAM_URL: 'https://node.testnet.casper.network/events/main',
+  CASPER_EVENT_STREAM_URL: 'https://node.testnet.casper.network/events',
   BACKEND_PRIVATE_KEY_PATH: '/home/azureuser/Desktop/keys/secret_key.pem',
 };
 
