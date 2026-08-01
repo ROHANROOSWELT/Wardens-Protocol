@@ -19,6 +19,7 @@ const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
 const CACHE_DIR = `${ROOT}/backend/.local`;
 const RECEIPTS_FILE = `${CACHE_DIR}/receipts.json`;
 const EXPLANATIONS_FILE = `${CACHE_DIR}/explanations.json`;
+const LAST_SCORE_IDS_FILE = `${CACHE_DIR}/last_score_ids.json`;
 
 const receipts: X402Receipt[] = [];
 const explanations = new Map<string, string>();
@@ -43,6 +44,14 @@ function loadStore() {
       }
     } catch {}
   }
+  if (existsSync(LAST_SCORE_IDS_FILE)) {
+    try {
+      const data = JSON.parse(readFileSync(LAST_SCORE_IDS_FILE, "utf8"));
+      for (const [k, v] of Object.entries(data)) {
+        lastScoreIdByAsset.set(k, v as number);
+      }
+    } catch {}
+  }
 }
 
 // Load from disk immediately on import
@@ -57,6 +66,17 @@ function saveExplanations() {
   ensureCacheDir();
   const obj = Object.fromEntries(explanations);
   writeFileSync(EXPLANATIONS_FILE, JSON.stringify(obj));
+}
+
+function saveLastScoreIds() {
+  ensureCacheDir();
+  writeFileSync(LAST_SCORE_IDS_FILE, JSON.stringify(Object.fromEntries(lastScoreIdByAsset)));
+}
+
+export function saveAll() {
+  saveReceipts();
+  saveExplanations();
+  saveLastScoreIds();
 }
 
 export function addReceipt(r: X402Receipt): void {
@@ -75,6 +95,7 @@ export function getExplanation(asset_id: string): string {
 }
 export function setLastScoreId(asset_id: string, id: number): void {
   lastScoreIdByAsset.set(asset_id, id);
+  saveLastScoreIds();
 }
 export function getLastScoreId(asset_id: string): number | undefined {
   return lastScoreIdByAsset.get(asset_id);
