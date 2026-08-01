@@ -10,7 +10,7 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { casper, type Asset, type Agent, type Challenge } from "./casperClient.ts";
+import { casper, type Asset, type Agent, type Challenge, type TrustScore, type VaultPosition } from "./casperClient.ts";
 import { setLastScoreId } from "./store.ts";
 import type { AssetStatus } from "./scoreEngine.ts";
 
@@ -28,8 +28,78 @@ const CACHE_FILE = `${CACHE_DIR}/chain_cache.json`;
 const ASSETS_FILE = `${CACHE_DIR}/tracked_assets.json`;
 const TXS_FILE = `${CACHE_DIR}/transactions.json`;
 
+const ASSETS_CACHE_FILE = `${CACHE_DIR}/assets.json`;
+const AGENTS_CACHE_FILE = `${CACHE_DIR}/agents.json`;
+const SCORES_CACHE_FILE = `${CACHE_DIR}/scores.json`;
+const CHALLENGES_CACHE_FILE = `${CACHE_DIR}/challenges.json`;
+const POSITIONS_CACHE_FILE = `${CACHE_DIR}/positions.json`;
+const ASSET_SCORE_IDS_CACHE_FILE = `${CACHE_DIR}/asset_score_ids.json`;
+
 function ensureCacheDir() {
   if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+export function persistAllState() {
+  ensureCacheDir();
+  try {
+    writeFileSync(ASSETS_CACHE_FILE, JSON.stringify(Array.from(casper.assets.entries()), null, 2));
+    writeFileSync(AGENTS_CACHE_FILE, JSON.stringify(Array.from(casper.agents.entries()), null, 2));
+    writeFileSync(SCORES_CACHE_FILE, JSON.stringify(Array.from(casper.scores.entries()), null, 2));
+    writeFileSync(CHALLENGES_CACHE_FILE, JSON.stringify(Array.from(casper.challenges.entries()), null, 2));
+    writeFileSync(POSITIONS_CACHE_FILE, JSON.stringify(Array.from(casper.positions.entries()), null, 2));
+    writeFileSync(ASSET_SCORE_IDS_CACHE_FILE, JSON.stringify(Array.from(casper.assetScoreIds.entries()), null, 2));
+    // Persist the sequence counters so they survive restarts without ID collisions.
+    writeFileSync(`${CACHE_DIR}/counters.json`, JSON.stringify({ scoreCount: casper.scoreCount, challengeCount: casper.challengeCount }));
+  } catch (e) {
+    console.error("[chainSync] failed to persist state:", e);
+  }
+}
+
+export function loadPersistedState() {
+  try {
+    if (existsSync(ASSETS_CACHE_FILE)) {
+      const data = JSON.parse(readFileSync(ASSETS_CACHE_FILE, "utf8"));
+      casper.assets = new Map(data);
+    }
+    if (existsSync(AGENTS_CACHE_FILE)) {
+      const data = JSON.parse(readFileSync(AGENTS_CACHE_FILE, "utf8"));
+      casper.agents = new Map(data);
+    }
+    if (existsSync(SCORES_CACHE_FILE)) {
+      const data = JSON.parse(readFileSync(SCORES_CACHE_FILE, "utf8"));
+      casper.scores = new Map(data);
+    }
+    if (existsSync(CHALLENGES_CACHE_FILE)) {
+      const data = JSON.parse(readFileSync(CHALLENGES_CACHE_FILE, "utf8"));
+      casper.challenges = new Map(data);
+    }
+    if (existsSync(POSITIONS_CACHE_FILE)) {
+      const data = JSON.parse(readFileSync(POSITIONS_CACHE_FILE, "utf8"));
+      casper.positions = new Map(data);
+    }
+    if (existsSync(ASSET_SCORE_IDS_CACHE_FILE)) {
+      const data = JSON.parse(readFileSync(ASSET_SCORE_IDS_CACHE_FILE, "utf8"));
+      casper.assetScoreIds = new Map(data);
+    }
+    // Restore sequence counters — critical: without this, new IDs collide with persisted ones.
+    const countersFile = `${CACHE_DIR}/counters.json`;
+    if (existsSync(countersFile)) {
+      const counters = JSON.parse(readFileSync(countersFile, "utf8"));
+      casper.scoreCount = counters.scoreCount ?? casper.scoreCount;
+      casper.challengeCount = counters.challengeCount ?? casper.challengeCount;
+    } else {
+      // Fallback: derive counters from the maps themselves.
+      if (casper.scores.size > 0) {
+        casper.scoreCount = Math.max(...Array.from(casper.scores.keys()));
+      }
+      if (casper.challenges.size > 0) {
+        casper.challengeCount = Math.max(...Array.from(casper.challenges.keys()));
+      }
+    }
+    console.log(`[chainSync] loaded state from disk: ${casper.assets.size} assets, ${casper.agents.size} agents, ${casper.scores.size} scores, ${casper.challenges.size} challenges. scoreCount=${casper.scoreCount} challengeCount=${casper.challengeCount}`);
+  } catch (e) {
+    console.warn("[chainSync] failed to load state from disk:", (e as Error).message);
+  }
 }
 
 export function persistTransaction(tx: import("./casperClient.ts").TxRecord) {
@@ -46,6 +116,7 @@ export function persistTransaction(tx: import("./casperClient.ts").TxRecord) {
     txs.push(tx);
   }
   writeFileSync(TXS_FILE, JSON.stringify(txs));
+  persistAllState();
 }
 
 /** Replace a placeholder transaction (by oldHash) with the confirmed on-chain one. */
@@ -64,7 +135,8 @@ export function replaceTransaction(
     txs = txs.filter((t) => t.deploy_hash !== oldHash);
     txs.push(tx);
     writeFileSync(TXS_FILE, JSON.stringify(txs));
-    console.log(`[chainSync] replaceTransaction: swapped ${oldHash.slice(0,20)}... -> ${tx.deploy_hash.slice(0,20)}... (was ${before} txs, now ${txs.length})`);
+    console.log(`[chainSync] replaceTransaction: swapped ${oldHash.slice(0, 20)}... -> ${tx.deploy_hash.slice(0, 20)}... (was ${before} txs, now ${txs.length})`);
+    persistAllState();
   } catch (e) {
     console.error(`[chainSync] replaceTransaction FAILED:`, e);
   }
@@ -155,7 +227,7 @@ function applyChainData(d: DumpData, requestedAssetId: string): void {
   const now = Date.now();
   if (d.asset && requestedAssetId) {
     const a = d.asset;
-    
+
     // FILTER OUT LEGACY ASSETS FOR A CLEAN DASHBOARD
     const tsMatch = a.asset_id.match(/INV-(\d+)-/);
     if (tsMatch) {
@@ -203,14 +275,22 @@ function applyChainData(d: DumpData, requestedAssetId: string): void {
     casper.agents.set(ag.agent_id, agent);
   }
   for (const ch of d.challenges ?? []) {
+    const existing = casper.challenges.get(ch.challenge_id);
     const challenge: Challenge = {
-      challenge_id: ch.challenge_id, asset_id: ch.asset_id, score_id: 0,
-      challenger_agent_id: ch.challenger_agent_id, challenged_agent_id: ch.challenged_agent_id,
-      counter_evidence_hash: "", counter_bond: Number(ch.counter_bond),
-      status: ch.status as Challenge["status"], opened_at: now, resolved_at: 0,
+      challenge_id: ch.challenge_id,
+      asset_id: ch.asset_id,
+      score_id: existing?.score_id || 0,
+      challenger_agent_id: ch.challenger_agent_id,
+      challenged_agent_id: ch.challenged_agent_id,
+      counter_evidence_hash: existing?.counter_evidence_hash || "",
+      counter_bond: Number(ch.counter_bond),
+      status: ch.status as Challenge["status"],
+      opened_at: existing?.opened_at || now,
+      resolved_at: existing?.resolved_at || (ch.status !== "Open" ? now : 0),
     };
     casper.challenges.set(ch.challenge_id, challenge);
   }
+  persistAllState();
 }
 
 function resolveSecretKeyPath(): string {
@@ -252,7 +332,7 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
     const finish = (res: { ok: boolean; error?: string }) => {
       if (resolved) return;
       resolved = true;
-      try { child.kill("SIGTERM"); } catch {}
+      try { child.kill("SIGTERM"); } catch { }
       resolve(res);
     };
 
@@ -263,7 +343,7 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
           applyChainData(JSON.parse(line.slice("DUMP ".length)) as DumpData, assetId);
           if (assetId) trackAssetLocally(assetId);
           finish({ ok: true });
-        } catch {}
+        } catch { }
       }
     };
 
@@ -296,6 +376,7 @@ export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; erro
 export async function syncAllFromChain(): Promise<void> {
   // Load tracked assets and past transactions from disk so they survive restarts
   loadPersistedTransactions();
+  loadPersistedState();
   const ASSETS: string[] = getTrackedAssets();
   console.log(`[chainSync] startup sync: pulling live state from Casper Testnet for ${ASSETS.length} assets…`);
   for (const assetId of ASSETS) {
@@ -310,7 +391,7 @@ export async function syncAllFromChain(): Promise<void> {
       console.warn(`[chainSync] ⚠ ${assetId}: ${result.error}`);
     }
   }
-  
+
   // Call with empty string to dump the agent list from the contract 
   // so the aggregator and challenger agents are loaded.
   await syncAssetFromChain("");
@@ -328,7 +409,7 @@ export async function syncAllFromChain(): Promise<void> {
     reputation: 100, total_reports: 0, successful_reports: 0, slashed_count: 0, active: true,
     x402_price: 1_000_000,
   });
-  
+
   const agentCount = casper.agents.size;
   console.log(`[chainSync] startup sync complete — ${casper.assets.size} assets, ${agentCount} agents in read-model.`);
 }

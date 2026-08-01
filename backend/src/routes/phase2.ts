@@ -15,9 +15,50 @@ import { x402Post } from "../services/x402Client.ts";
 import { setExplanation, addReceipt, setLastScoreId } from "../services/store.ts";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url));
+
+// ── Phase 2 off-chain persistence ─────────────────────────────────────────
+const P2_CACHE_DIR = `${ROOT}/backend/.local`;
+const P2_STATE_FILE = `${P2_CACHE_DIR}/phase2_state.json`;
+
+function ensureP2CacheDir() {
+  if (!existsSync(P2_CACHE_DIR)) mkdirSync(P2_CACHE_DIR, { recursive: true });
+}
+
+function saveP2State() {
+  try {
+    ensureP2CacheDir();
+    writeFileSync(P2_STATE_FILE, JSON.stringify({
+      tranches: Array.from(tranches.entries()),
+      trancheSeq,
+      commitments: Array.from(commitments.entries()),
+      commitSeq,
+      votes: Array.from(((casper as any)._votes as Map<string, any> ?? new Map()).entries()),
+    }));
+  } catch (e) {
+    console.error("[phase2] failed to persist phase2 state:", e);
+  }
+}
+
+function loadP2State() {
+  if (!existsSync(P2_STATE_FILE)) return;
+  try {
+    const raw = JSON.parse(readFileSync(P2_STATE_FILE, "utf8"));
+    if (raw.tranches) { tranches.clear(); for (const [k, v] of raw.tranches) tranches.set(Number(k), v); }
+    if (raw.trancheSeq !== undefined) trancheSeq = raw.trancheSeq;
+    if (raw.commitments) { commitments.clear(); for (const [k, v] of raw.commitments) commitments.set(Number(k), v); }
+    if (raw.commitSeq !== undefined) commitSeq = raw.commitSeq;
+    if (raw.votes) {
+      if (!(casper as any)._votes) (casper as any)._votes = new Map();
+      for (const [k, v] of raw.votes) (casper as any)._votes.set(k, v);
+    }
+    console.log(`[phase2] loaded phase2 state: ${tranches.size} tranches, ${commitments.size} commitments.`);
+  } catch (e) {
+    console.warn("[phase2] failed to load phase2 state:", (e as Error).message);
+  }
+}
 
 function getPhase2Bin(): string {
   const rel = `${ROOT}/contracts/wardens_phase2/target/release/wardens_phase2_livenet`;
@@ -140,6 +181,7 @@ phase2Router.post("/arbitration/vote", async (req, res) => {
     }
     if (!(casper as any)._votes) (casper as any)._votes = new Map();
     (casper as any)._votes.set(voteKey, votes);
+    saveP2State();
 
     // Auto-resolve at MIN_ARBITRATION_VOTES = 2.
     const MIN_VOTES = 2;
@@ -149,11 +191,13 @@ phase2Router.post("/arbitration/vote", async (req, res) => {
     if (votes.upheld.length >= MIN_VOTES) {
       const tx = await casper.resolveChallenge(Number(challenge_id), true);
       resolved = true; finalUpheld = true;
+      saveP2State();
       return res.json({ vote_cast: true, resolved, upheld: true, deploy_hash: tx.deploy_hash });
     }
     if (votes.rejected.length >= MIN_VOTES) {
       const tx = await casper.resolveChallenge(Number(challenge_id), false);
       resolved = true; finalUpheld = false;
+      saveP2State();
       return res.json({ vote_cast: true, resolved, upheld: false, deploy_hash: tx.deploy_hash });
     }
 
@@ -189,6 +233,12 @@ phase2Router.get("/covenant/:asset_id", (req, res) => {
 const tranches = new Map<number, { asset_id: string; amount: number; released: boolean; blocked: boolean }>();
 let trancheSeq = 0;
 
+const commitments = new Map<number, { asset_id: string; committer: string; merkle_root: string; revealed: boolean; reveal_hash: string }>();
+let commitSeq = 0;
+
+// Load persisted phase2 state immediately on module import.
+loadP2State();
+
 phase2Router.post("/reserve/tranche", async (req, res) => {
   try {
     const { asset_id, amount } = req.body ?? {};
@@ -208,6 +258,7 @@ phase2Router.post("/reserve/tranche", async (req, res) => {
     } else {
       const tid = ++trancheSeq;
       tranches.set(tid, { asset_id, amount: Number(amount ?? 0), released: false, blocked: false });
+      saveP2State();
       res.json({ tranche_id: tid, asset_id, amount, on_chain: false });
     }
   } catch(e) {
@@ -233,10 +284,12 @@ phase2Router.post("/reserve/release", async (req, res) => {
       if (score < 85) {
         tr.blocked = true;
         tranches.set(Number(tranche_id), tr);
+        saveP2State();
         return res.status(403).json({ error: "DrawsFrozen", reason: `Covenant requires score≥85 for tranche release. Current: ${score}` });
       }
       tr.released = true;
       tranches.set(Number(tranche_id), tr);
+      saveP2State();
       res.json({ ok: true, tranche_id, asset_id: tr.asset_id, amount: tr.amount, on_chain: false, message: "Tranche released — CovenantEngine: FullAccess" });
     }
   } catch(e) {
@@ -252,9 +305,6 @@ phase2Router.get("/reserve/tranches/:asset_id", (req, res) => {
 });
 
 // ── Privacy: store and reveal evidence commitments ────────────────────────
-
-const commitments = new Map<number, { asset_id: string; committer: string; merkle_root: string; revealed: boolean; reveal_hash: string }>();
-let commitSeq = 0;
 
 phase2Router.post("/privacy/commit", async (req, res) => {
   try {
@@ -281,6 +331,7 @@ phase2Router.post("/privacy/commit", async (req, res) => {
         revealed: false,
         reveal_hash: "",
       });
+      saveP2State();
       res.json({ commitment_id: cid, asset_id, merkle_root, on_chain: false, message: "Commitment stored locally (Merkle root only)" });
     }
   } catch(e) {
@@ -307,6 +358,7 @@ phase2Router.post("/privacy/reveal", async (req, res) => {
       c.revealed = true;
       c.reveal_hash = reveal_hash;
       commitments.set(Number(commitment_id), c);
+      saveP2State();
       res.json({ ok: true, commitment_id, revealed: true, on_chain: false });
     }
   } catch(e) {
