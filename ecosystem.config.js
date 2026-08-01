@@ -4,16 +4,20 @@ const sharedEnv = {
   ODRA_CASPER_LIVENET_NODE_ADDRESS: 'https://node.testnet.casper.network/rpc',
   ODRA_CASPER_LIVENET_CHAIN_NAME: 'casper-test',
   ODRA_CASPER_LIVENET_SECRET_KEY_PATH: '/home/azureuser/Desktop/keys/secret_key.pem',
-  ODRA_CASPER_LIVENET_EVENTS_URL: 'http://135.181.17.229:9999/events',
+  ODRA_CASPER_LIVENET_EVENTS_URL: 'http://54.39.243.231:9999/events',
+  CASPER_NODE_URL: 'http://135.181.17.229:7777',
+  CASPER_CHAIN_NAME: 'casper-test',
+  CASPER_EVENT_STREAM_URL: 'http://54.39.243.231:9999/events',
+  BACKEND_PRIVATE_KEY_PATH: '/home/azureuser/Desktop/keys/secret_key.pem',
 };
 
 module.exports = {
   apps: [
-    { name: 'backend',    script: 'bun', args: 'src/index.ts',  cwd: './backend',                autorestart: true, env: { ...sharedEnv, PORT: '4000' } },
-    { name: 'parser',     script: 'bun', args: 'src/index.ts', cwd: './agents/parser-agent',    autorestart: true, env: { ...sharedEnv, PORT: '4101' } },
-    { name: 'fraud',      script: 'bun', args: 'src/index.ts', cwd: './agents/fraud-agent',      autorestart: true, env: { ...sharedEnv, PORT: '4102' } },
-    { name: 'registry',   script: 'bun', args: 'src/index.ts', cwd: './agents/registry-agent',   autorestart: true, env: { ...sharedEnv, PORT: '4103' } },
-    { name: 'aggregator', script: 'bun', args: 'src/index.ts', cwd: './agents/aggregator-agent', autorestart: false, env: sharedEnv },
-    { name: 'challenger', script: 'bun', args: 'src/index.ts', cwd: './agents/challenger-agent', autorestart: false, env: sharedEnv },
+    { name: 'backend',    script: 'bun', args: 'src/index.ts',  cwd: './backend',                autorestart: true,  env: { ...sharedEnv, PORT: '4000' } },
+    { name: 'parser',     script: 'bun', args: 'src/index.ts',  cwd: './agents/parser-agent',    autorestart: true,  env: { ...sharedEnv, PORT: '4101' } },
+    { name: 'fraud',      script: 'bun', args: 'src/index.ts',  cwd: './agents/fraud-agent',     autorestart: true,  env: { ...sharedEnv, PORT: '4102' } },
+    { name: 'registry',   script: 'bun', args: 'src/index.ts',  cwd: './agents/registry-agent',  autorestart: true,  env: { ...sharedEnv, PORT: '4103' } },
+    { name: 'aggregator', script: 'bun', args: 'src/index.ts',  cwd: './agents/aggregator-agent', autorestart: false, env: sharedEnv },
+    { name: 'challenger', script: 'bun', args: 'src/index.ts',  cwd: './agents/challenger-agent', autorestart: false, env: sharedEnv },
   ]
 };
