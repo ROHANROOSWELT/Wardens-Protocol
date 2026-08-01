@@ -14,15 +14,15 @@ done
 echo '["INV-001","INV-002-DUPLICATE","INV-003-LYING-SCORE"]' > backend/.local/tracked_assets.json
 
 # Fix backend IP just in case
-sed -i 's|18.232.115.176|135.181.17.229|g' backend/.env || true
+sed -i 's|135.181.17.229|54.39.243.231|g' backend/.env || true
 pm2 restart backend
 
 # Export env vars
 source ~/.cargo/env
-export ODRA_CASPER_LIVENET_NODE_ADDRESS=http://135.181.17.229:7777
+export ODRA_CASPER_LIVENET_NODE_ADDRESS=https://node.testnet.casper.network/rpc
 export ODRA_CASPER_LIVENET_CHAIN_NAME=casper-test
 export ODRA_CASPER_LIVENET_SECRET_KEY_PATH=/home/azureuser/Desktop/keys/secret_key.pem
-export ODRA_CASPER_LIVENET_EVENTS_URL=http://135.181.17.229:9999/events
+export ODRA_CASPER_LIVENET_EVENTS_URL=http://54.39.243.231:9999/events
 
 # Run the FULL demo sequence sequentially
 nohup bash -c '
