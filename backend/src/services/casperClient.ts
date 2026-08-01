@@ -151,7 +151,7 @@ function runLivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string
     const finish = (err: Error | null, deployHash?: string) => {
       if (resolved) return;
       resolved = true;
-      try { child.kill("SIGTERM"); } catch {}
+      try { child.kill("SIGTERM"); } catch { }
       if (err) return reject(err);
       resolve({ stdout, stderr, deployHash: deployHash! });
     };
@@ -450,22 +450,49 @@ class WardensChainClient {
       c.counter_bond.toString(),
     ]);
     const challengeIdMatch = stdout.match(/CHALLENGE_ID=(\d+)/);
-    const challenge_id = challengeIdMatch ? Number(challengeIdMatch[1]) : 0;
+    // Use chain-returned ID if available, otherwise derive a local sequential ID.
+    const chainChallengeId = challengeIdMatch ? Number(challengeIdMatch[1]) : 0;
 
-    const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
+    const { syncAssetFromChain, persistTransaction, persistAllState } = await import("./chainSync.ts");
     const score = this.scores.get(c.score_id);
     const assetId = score ? score.asset_id : "";
+
+    // ── Optimistic insert ──────────────────────────────────────────────────
+    // Add the challenge to the read-model immediately after TX confirmation
+    // so it's visible in the Challenge Court UI without waiting for the dump.
+    // The chain sync below will refine the record if it returns better data.
+    this.challengeCount += 1;
+    const localId = chainChallengeId || this.challengeCount;
+    const now = Date.now();
+    const optimisticChallenge: Challenge = {
+      challenge_id: localId,
+      asset_id: assetId,
+      score_id: c.score_id,
+      challenger_agent_id: c.challenger_agent_id,
+      challenged_agent_id: score?.agent_id ?? "(on-chain)",
+      counter_evidence_hash: c.counter_evidence_hash,
+      counter_bond: c.counter_bond,
+      status: "Open",
+      opened_at: now,
+      resolved_at: 0,
+    };
+    this.challenges.set(localId, optimisticChallenge);
+    // Mark the score as challenged so the dashboard shows the right state.
+    if (score) score.challenged = true;
+    persistAllState(); // flush to disk immediately — survives restarts
+
+    // Best-effort live sync to refine with actual chain state.
     if (assetId) await syncAssetFromChain(assetId);
 
     const tx: TxRecord = {
       action: "open_challenge",
       deploy_hash: deployHash,
-      result: `Challenge ${challenge_id} opened`,
-      timestamp: Date.now(),
+      result: `Challenge ${localId} opened`,
+      timestamp: now,
     };
     this.txs.push(tx);
     persistTransaction(tx);
-    return { ...tx, challenge_id };
+    return { ...tx, challenge_id: localId };
   }
 
   async resolveChallenge(challenge_id: number, upheld: boolean): Promise<TxRecord> {
