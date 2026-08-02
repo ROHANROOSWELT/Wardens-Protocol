@@ -156,20 +156,8 @@ function runLivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string
       resolve({ stdout, stderr, deployHash: deployHash! });
     };
 
-    const checkStream = () => {
-      const combined = stdout + "\n" + stderr;
-      const match =
-        combined.match(/(?:deploy|transaction)\/([a-fA-F0-9]{64})/i) ||
-        combined.match(/(?:deploy|transaction) hash:?\s*([a-fA-F0-9]{64})/i) ||
-        combined.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i) ||
-        combined.match(/Transaction "([a-fA-F0-9]{64})" successfully executed/i);
-      if (match) {
-        finish(null, match[1]);
-      }
-    };
-
-    child.stdout.on("data", (d) => { stdout += d; checkStream(); });
-    child.stderr.on("data", (d) => { stderr += d; checkStream(); });
+    child.stdout.on("data", (d) => { stdout += d; });
+    child.stderr.on("data", (d) => { stderr += d; });
     child.on("error", (e) => finish(e));
     child.on("close", (code) => {
       if (resolved) return;
