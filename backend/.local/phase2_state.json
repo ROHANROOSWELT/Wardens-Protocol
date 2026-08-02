@@ -1,1 +1,0 @@
-{"tranches":[[1,{"asset_id":"INV-001","amount":500,"released":false,"blocked":true}],[2,{"asset_id":"INV-001","amount":500,"released":false,"blocked":false}]],"trancheSeq":2,"commitments":[[1,{"asset_id":"INV-001","committer":"aggregator-agent-1","merkle_root":"sha256:test-root-abc123","revealed":false,"reveal_hash":""}]],"commitSeq":1,"votes":[]}
