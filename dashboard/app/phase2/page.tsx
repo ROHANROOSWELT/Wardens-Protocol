@@ -31,13 +31,13 @@ export default function Phase2Dashboard() {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [prices, setPrices] = useState<any[]>([]);
   const [dynamicAssets, setDynamicAssets] = useState<string[]>([]);
-  const [log, setLog] = useState<string[]>([]);
+  const [log, setLog] = useState<React.ReactNode[]>([]);
   const [busy, setBusy] = useState(false);
   const [debugError, setDebugError] = useState<string>("");
   const [trancheAmount, setTrancheAmount] = useState<number>(500);
   const [committerId, setCommitterId] = useState<string>("aggregator-agent-1");
 
-  const note = (m: string) => setLog((l) => [m, ...l].slice(0, 12));
+  const note = (m: React.ReactNode) => setLog((l) => [m, ...l].slice(0, 12));
 
   const refresh = useCallback(async () => {
     const [c, cov, tr, cm, pr, aList] = await Promise.all([
@@ -70,20 +70,35 @@ export default function Phase2Dashboard() {
 
   const createTranche = () => run("Create tranche", async () => {
     const r = await post("/api/p2/reserve/tranche", { asset_id: asset, amount: trancheAmount });
-    note(r.ok ? `✓ Tranche #${r.data.tranche_id} created (${trancheAmount} CSPR)` : `✗ ${r.data.error}`);
+    if (r.ok) {
+      const link = r.data.deploy_hash ? <a href={explorerLink(r.data.deploy_hash)} target="_blank" className="text-[#2FD98A] underline ml-2">[tx proof]</a> : null;
+      note(<span>✓ Tranche #{r.data.tranche_id} created ({trancheAmount} CSPR){link}</span>);
+    } else {
+      note(`✗ ${r.data.error}`);
+    }
   });
 
   const releaseTranche = () => run("Release tranche", async () => {
     const pending = tranches.find((t) => !t.released && !t.blocked);
     if (!pending) return note("✗ No pending tranche");
     const r = await post("/api/p2/reserve/release", { tranche_id: pending.tranche_id });
-    note(r.ok ? `✓ Tranche #${pending.tranche_id} released` : `✗ ${r.data.error} — ${r.data.reason ?? ""}`);
+    if (r.ok) {
+      const link = r.data.deploy_hash ? <a href={explorerLink(r.data.deploy_hash)} target="_blank" className="text-[#2FD98A] underline ml-2">[tx proof]</a> : null;
+      note(<span>✓ Tranche #${pending.tranche_id} released{link}</span>);
+    } else {
+      note(`✗ ${r.data.error} — ${r.data.reason ?? ""}`);
+    }
   });
 
   const commitEvidence = () => run("Store evidence commitment", async () => {
     const root = `sha256:merkle-${Date.now().toString(36)}`;
     const r = await post("/api/p2/privacy/commit", { asset_id: asset, committer: committerId, merkle_root: root });
-    note(r.ok ? `✓ Commitment #${r.data.commitment_id} stored` : `✗ ${r.data.error}`);
+    if (r.ok) {
+      const link = r.data.deploy_hash ? <a href={explorerLink(r.data.deploy_hash)} target="_blank" className="text-[#2FD98A] underline ml-2">[tx proof]</a> : null;
+      note(<span>✓ Commitment #${r.data.commitment_id} stored{link}</span>);
+    } else {
+      note(`✗ ${r.data.error}`);
+    }
   });
 
   const revealEvidence = () => run("Reveal evidence", async () => {
