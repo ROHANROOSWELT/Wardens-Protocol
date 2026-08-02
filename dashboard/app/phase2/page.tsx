@@ -20,8 +20,9 @@ const covenantIcon = (state: string) =>
       state === "DrawsFrozen" ? "lock" : "emergency";
 
 type Tranche = { tranche_id: number; asset_id: string; amount: number; released: boolean; blocked: boolean; deploy_hash?: string };
-type Commitment = { commitment_id: number; asset_id: string; committer: string; merkle_root: string; revealed: boolean; deploy_hash?: string };
+type Commitment = { commitment_id: number; asset_id: string; committer: string; merkle_root: string; revealed: boolean; deploy_hash?: string; reveal_deploy_hash?: string };
 type Vote = { agent_id: string; vote: boolean };
+type LogEntry = { id: number; text: string; hash?: string; isError?: boolean };
 
 export default function Phase2Dashboard() {
   const [chain, setChain] = useState<{ mode: string }>({ mode: "sim" });
@@ -31,13 +32,26 @@ export default function Phase2Dashboard() {
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [prices, setPrices] = useState<any[]>([]);
   const [dynamicAssets, setDynamicAssets] = useState<string[]>([]);
-  const [log, setLog] = useState<React.ReactNode[]>([]);
+  const [log, setLog] = useState<LogEntry[]>([]);
   const [busy, setBusy] = useState(false);
   const [debugError, setDebugError] = useState<string>("");
   const [trancheAmount, setTrancheAmount] = useState<number>(500);
   const [committerId, setCommitterId] = useState<string>("aggregator-agent-1");
 
-  const note = (m: React.ReactNode) => setLog((l) => [m, ...l].slice(0, 12));
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("phase2_logs");
+      if (saved) setLog(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  const note = (text: string, hash?: string, isError?: boolean) => {
+    setLog((prev) => {
+      const newLog = [{ id: Date.now(), text, hash, isError }, ...prev].slice(0, 12);
+      localStorage.setItem("phase2_logs", JSON.stringify(newLog));
+      return newLog;
+    });
+  };
 
   const refresh = useCallback(async () => {
     const [c, cov, tr, cm, pr, aList] = await Promise.all([
@@ -64,29 +78,27 @@ export default function Phase2Dashboard() {
   async function run(label: string, fn: () => Promise<void>) {
     setBusy(true);
     try { await fn(); }
-    catch (e) { note(`✗ ${label}: ${(e as Error).message}`); }
+    catch (e) { note(`✗ ${label}: ${(e as Error).message}`, undefined, true); }
     finally { await refresh(); setBusy(false); }
   }
 
   const createTranche = () => run("Create tranche", async () => {
     const r = await post("/api/p2/reserve/tranche", { asset_id: asset, amount: trancheAmount });
     if (r.ok) {
-      const link = r.data.deploy_hash ? <a href={explorerLink(r.data.deploy_hash)} target="_blank" className="text-[#2FD98A] underline ml-2">[tx proof]</a> : null;
-      note(<span>✓ Tranche #{r.data.tranche_id} created ({trancheAmount} CSPR){link}</span>);
+      note(`✓ Tranche #${r.data.tranche_id} created (${trancheAmount} CSPR)`, r.data.deploy_hash);
     } else {
-      note(`✗ ${r.data.error}`);
+      note(`✗ ${r.data.error}`, undefined, true);
     }
   });
 
   const releaseTranche = () => run("Release tranche", async () => {
     const pending = tranches.find((t) => !t.released && !t.blocked);
-    if (!pending) return note("✗ No pending tranche");
+    if (!pending) return note("✗ No pending tranche", undefined, true);
     const r = await post("/api/p2/reserve/release", { tranche_id: pending.tranche_id });
     if (r.ok) {
-      const link = r.data.deploy_hash ? <a href={explorerLink(r.data.deploy_hash)} target="_blank" className="text-[#2FD98A] underline ml-2">[tx proof]</a> : null;
-      note(<span>✓ Tranche #${pending.tranche_id} released{link}</span>);
+      note(`✓ Tranche #${pending.tranche_id} released`, r.data.deploy_hash);
     } else {
-      note(`✗ ${r.data.error} — ${r.data.reason ?? ""}`);
+      note(`✗ ${r.data.error} — ${r.data.reason ?? ""}`, undefined, true);
     }
   });
 
@@ -94,18 +106,21 @@ export default function Phase2Dashboard() {
     const root = `sha256:merkle-${Date.now().toString(36)}`;
     const r = await post("/api/p2/privacy/commit", { asset_id: asset, committer: committerId, merkle_root: root });
     if (r.ok) {
-      const link = r.data.deploy_hash ? <a href={explorerLink(r.data.deploy_hash)} target="_blank" className="text-[#2FD98A] underline ml-2">[tx proof]</a> : null;
-      note(<span>✓ Commitment #${r.data.commitment_id} stored{link}</span>);
+      note(`✓ Commitment #${r.data.commitment_id} stored`, r.data.deploy_hash);
     } else {
-      note(`✗ ${r.data.error}`);
+      note(`✗ ${r.data.error}`, undefined, true);
     }
   });
 
   const revealEvidence = () => run("Reveal evidence", async () => {
     const pending = commitments.find((c) => !c.revealed);
-    if (!pending) return note("✗ No unrevealed commitment");
+    if (!pending) return note("✗ No unrevealed commitment", undefined, true);
     const r = await post("/api/p2/privacy/reveal", { commitment_id: pending.commitment_id, reveal_hash: pending.merkle_root });
-    note(r.ok ? `✓ Commitment #${pending.commitment_id} revealed` : `✗ ${r.data.error}`);
+    if (r.ok) {
+      note(`✓ Commitment #${pending.commitment_id} revealed`, r.data.deploy_hash);
+    } else {
+      note(`✗ ${r.data.error}`, undefined, true);
+    }
   });
 
   const underwrite = () => run("Insurance underwriting (x402)", async () => {
@@ -114,7 +129,7 @@ export default function Phase2Dashboard() {
       const src = r.data.source === "local-fallback" ? " [local fallback]" : " [x402]";
       note(`✓ Score ${r.data.insurance_score}/100 | Premium: ${r.data.premium_bps ?? "??"}bps | Coverage: ${r.data.coverage_pct ?? "??"}% | Covenant: ${r.data.covenant_state}${src}`);
     } else {
-      note(`✗ ${r.data.error}`);
+      note(`✗ ${r.data.error}`, undefined, true);
     }
   });
 
@@ -145,7 +160,7 @@ export default function Phase2Dashboard() {
         note(`✓ Vote cast by ${arb_id} — ${r.data.upheld_votes ?? 1}/${r.data.needed ?? 2} votes cast`);
       }
     } else {
-      note(`✗ ${r.data.error}`);
+      note(`✗ ${r.data.error}`, undefined, true);
     }
   });
 
@@ -371,7 +386,16 @@ export default function Phase2Dashboard() {
         <h2 className="text-headline-sm font-black uppercase mb-sm">Console</h2>
         <div className="flex flex-col gap-base font-mono-plex text-body-sm">
           {log.length === 0 && <span className="text-on-surface-variant">No actions yet.</span>}
-          {log.map((l, i) => <div key={i} className="text-on-surface-variant">{l}</div>)}
+          {log.map((l) => (
+            <div key={l.id} className={l.isError ? "text-error" : "text-on-surface-variant"}>
+              {l.text}
+              {l.hash && (
+                <a href={explorerLink(l.hash)} target="_blank" className="text-[#2FD98A] underline ml-2">
+                  [tx proof]
+                </a>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
