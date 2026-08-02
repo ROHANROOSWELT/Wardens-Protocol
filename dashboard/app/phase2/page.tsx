@@ -34,6 +34,8 @@ export default function Phase2Dashboard() {
   const [log, setLog] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [debugError, setDebugError] = useState<string>("");
+  const [trancheAmount, setTrancheAmount] = useState<number>(500);
+  const [committerId, setCommitterId] = useState<string>("aggregator-agent-1");
 
   const note = (m: string) => setLog((l) => [m, ...l].slice(0, 12));
 
@@ -67,8 +69,8 @@ export default function Phase2Dashboard() {
   }
 
   const createTranche = () => run("Create tranche", async () => {
-    const r = await post("/api/p2/reserve/tranche", { asset_id: asset, amount: 500 });
-    note(r.ok ? `✓ Tranche #${r.data.tranche_id} created (500 CSPR)` : `✗ ${r.data.error}`);
+    const r = await post("/api/p2/reserve/tranche", { asset_id: asset, amount: trancheAmount });
+    note(r.ok ? `✓ Tranche #${r.data.tranche_id} created (${trancheAmount} CSPR)` : `✗ ${r.data.error}`);
   });
 
   const releaseTranche = () => run("Release tranche", async () => {
@@ -80,7 +82,7 @@ export default function Phase2Dashboard() {
 
   const commitEvidence = () => run("Store evidence commitment", async () => {
     const root = `sha256:merkle-${Date.now().toString(36)}`;
-    const r = await post("/api/p2/privacy/commit", { asset_id: asset, committer: "aggregator-agent-1", merkle_root: root });
+    const r = await post("/api/p2/privacy/commit", { asset_id: asset, committer: committerId, merkle_root: root });
     note(r.ok ? `✓ Commitment #${r.data.commitment_id} stored` : `✗ ${r.data.error}`);
   });
 
@@ -217,10 +219,13 @@ export default function Phase2Dashboard() {
             ReserveVault
           </h2>
           <div className="flex gap-sm flex-wrap mb-md">
-            <button onClick={createTranche} disabled={busy}
-              className="border-[3px] border-on-surface bg-surface text-label-md uppercase px-sm py-xs neobrutalist-btn disabled:opacity-50">
-              Create Tranche
-            </button>
+            <div className="flex items-center gap-xs">
+              <input type="number" value={trancheAmount} onChange={(e) => setTrancheAmount(Number(e.target.value))} className="border-[3px] border-on-surface bg-surface px-sm py-xs w-24 text-body-md neobrutalist-btn" />
+              <button onClick={createTranche} disabled={busy}
+                className="border-[3px] border-on-surface bg-surface text-label-md uppercase px-sm py-xs neobrutalist-btn disabled:opacity-50">
+                Create Tranche
+              </button>
+            </div>
             <button onClick={releaseTranche} disabled={busy}
               className="border-[3px] border-[#2FD98A] bg-[#2FD98A]/10 text-label-md uppercase px-sm py-xs neobrutalist-btn disabled:opacity-50">
               Release Tranche
@@ -244,10 +249,16 @@ export default function Phase2Dashboard() {
             PrivacyCommitmentStore
           </h2>
           <div className="flex gap-sm flex-wrap mb-md">
-            <button onClick={commitEvidence} disabled={busy}
-              className="border-[3px] border-on-surface bg-surface text-label-md uppercase px-sm py-xs neobrutalist-btn disabled:opacity-50">
-              Commit Evidence
-            </button>
+            <div className="flex items-center gap-xs">
+              <select value={committerId} onChange={(e) => setCommitterId(e.target.value)} className="border-[3px] border-on-surface bg-surface px-sm py-xs text-body-md neobrutalist-btn">
+                <option value="aggregator-agent-1">aggregator-agent-1</option>
+                <option value="challenger-agent-1">challenger-agent-1</option>
+              </select>
+              <button onClick={commitEvidence} disabled={busy}
+                className="border-[3px] border-on-surface bg-surface text-label-md uppercase px-sm py-xs neobrutalist-btn disabled:opacity-50">
+                Commit Evidence
+              </button>
+            </div>
             <button onClick={revealEvidence} disabled={busy}
               className="border-[3px] border-[#6C698D] bg-[#6C698D]/10 text-label-md uppercase px-sm py-xs neobrutalist-btn disabled:opacity-50">
               Reveal Evidence
