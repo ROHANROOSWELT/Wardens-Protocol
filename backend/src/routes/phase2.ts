@@ -238,6 +238,12 @@ phase2Router.post("/reserve/tranche", async (req, res) => {
       tranches.set(tranche_id, { asset_id, amount: Number(amount ?? 0), released: false, blocked: false, deploy_hash: deployHash });
       if (tranche_id > trancheSeq) trancheSeq = tranche_id;
       saveP2State();
+      
+      const tx = { action: "create_tranche", deploy_hash: deployHash, result: `Tranche ${tranche_id} created`, timestamp: Date.now() };
+      casper.txs.push(tx);
+      const { persistTransaction } = await import("../services/chainSync.ts");
+      persistTransaction(tx);
+
       res.json({ tranche_id, asset_id, amount, on_chain: true, deploy_hash: deployHash });
     } else {
       const tid = ++trancheSeq;
@@ -276,6 +282,12 @@ phase2Router.post("/reserve/release", async (req, res) => {
       tr.deploy_hash = deployHash; // update with release hash
       tranches.set(Number(tranche_id), tr);
       saveP2State();
+      
+      const tx = { action: "release_tranche", deploy_hash: deployHash, result: `Tranche ${tranche_id} released`, timestamp: Date.now() };
+      casper.txs.push(tx);
+      const { persistTransaction } = await import("../services/chainSync.ts");
+      persistTransaction(tx);
+
       res.json({ ok: true, tranche_id, asset_id: tr.asset_id, amount: tr.amount, on_chain: true, deploy_hash: deployHash, message: "Tranche released on-chain — CovenantEngine: FullAccess" });
     } else {
       tr.released = true;
@@ -313,6 +325,12 @@ phase2Router.post("/privacy/commit", async (req, res) => {
       commitments.set(commitment_id, { asset_id, committer: committer ?? "anonymous", merkle_root, revealed: false, reveal_hash: "", deploy_hash: deployHash });
       if (commitment_id > commitSeq) commitSeq = commitment_id;
       saveP2State();
+
+      const tx = { action: "store_commitment", deploy_hash: deployHash, result: `Commitment ${commitment_id} stored`, timestamp: Date.now() };
+      casper.txs.push(tx);
+      const { persistTransaction } = await import("../services/chainSync.ts");
+      persistTransaction(tx);
+
       res.json({ commitment_id, asset_id, merkle_root, on_chain: true, deploy_hash: deployHash, message: "Commitment stored on-chain (Merkle root only)" });
     } else {
       const cid = ++commitSeq;
@@ -332,7 +350,13 @@ phase2Router.post("/privacy/reveal", async (req, res) => {
     if (process.env.WARDENS_MODE === "chain") {
       const hash = process.env.WARDENS_PRIVACY_STORE_HASH;
       if (!hash) return res.status(500).json({ error: "WARDENS_PRIVACY_STORE_HASH not configured" });
-      await runPhase2LivenetCmd(["call", "PrivacyCommitmentStore", hash, "reveal_commitment", String(commitment_id), reveal_hash]);
+      const { stdout, deployHash } = await runPhase2LivenetCmd(["call", "PrivacyCommitmentStore", hash, "reveal_commitment", String(commitment_id), reveal_hash]);
+      
+      const tx = { action: "reveal_commitment", deploy_hash: deployHash, result: `Commitment ${commitment_id} revealed`, timestamp: Date.now() };
+      casper.txs.push(tx);
+      const { persistTransaction } = await import("../services/chainSync.ts");
+      persistTransaction(tx);
+
       res.json({ ok: true, commitment_id, revealed: true, on_chain: true });
     } else {
       const c = commitments.get(Number(commitment_id));

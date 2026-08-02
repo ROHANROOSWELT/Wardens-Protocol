@@ -12,6 +12,7 @@ export interface VerifyResult {
   valid: boolean;
   score: number;
   findings: string[];
+  [key: string]: any;
 }
 
 export interface VerifierConfig {
@@ -70,12 +71,9 @@ export function serveVerifier(cfg: VerifierConfig): void {
       return Response.json({
         paid: true,
         x402_receipt,
-        agent: cfg.agent,
-        valid: result.valid,
-        score: result.score,
-        findings: result.findings,
         explanation,
         evidence_hash,
+        ...result,
       });
     },
   });

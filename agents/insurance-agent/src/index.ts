@@ -97,6 +97,8 @@ function verify(body: AssetInput): VerifyResult {
     valid: risk_score >= 50,
     score: risk_score,
     findings,
+    premium_bps,
+    coverage_pct,
   };
 }
 
