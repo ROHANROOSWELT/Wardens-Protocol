@@ -32,3 +32,4 @@ keys/
 final_build_prompt.md
 keys.tar.gz
 backend/.local/
+.vercel
