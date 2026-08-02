@@ -156,8 +156,30 @@ function runLivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string
       resolve({ stdout, stderr, deployHash: deployHash! });
     };
 
-    child.stdout.on("data", (d) => { stdout += d; });
-    child.stderr.on("data", (d) => { stderr += d; });
+    let finishTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const checkStream = () => {
+      const combined = stdout + "\n" + stderr;
+      const deployMatch =
+        combined.match(/(?:deploy|transaction)\/([a-fA-F0-9]{64})/i) ||
+        combined.match(/(?:deploy|transaction) hash:?\s*([a-fA-F0-9]{64})/i) ||
+        combined.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i) ||
+        combined.match(/Transaction "([a-fA-F0-9]{64})" successfully executed/i);
+      
+      const successMatch =
+        combined.match(/SCORE_ID=\d+/) ||
+        combined.match(/OK /) ||
+        combined.match(/CHALLENGE_ID=\d+/);
+
+      if (deployMatch && successMatch && !finishTimeout) {
+        finish(null, deployMatch[1]);
+      } else if (deployMatch && !finishTimeout) {
+        finishTimeout = setTimeout(() => finish(null, deployMatch[1]), 2500);
+      }
+    };
+
+    child.stdout.on("data", (d) => { stdout += d; checkStream(); });
+    child.stderr.on("data", (d) => { stderr += d; checkStream(); });
     child.on("error", (e) => finish(e));
     child.on("close", (code) => {
       if (resolved) return;
@@ -170,7 +192,7 @@ function runLivenetCmd(args: string[]): Promise<{ stdout: string; stderr: string
         combined.match(/(?:deploy|transaction) hash:?\s*([a-fA-F0-9]{64})/i) ||
         combined.match(/(?:deploy|transaction)\s+"([a-fA-F0-9]{64})"/i) ||
         combined.match(/Transaction "([a-fA-F0-9]{64})" successfully executed/i);
-      // Reject if no real on-chain deploy hash found — never fabricate a fake hash.
+      
       if (!match) {
         return finish(new Error(
           `No deploy hash found in CLI output — the transaction may not have been submitted.\n` +
