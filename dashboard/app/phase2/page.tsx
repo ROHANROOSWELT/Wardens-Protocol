@@ -94,7 +94,8 @@ export default function Phase2Dashboard() {
   const underwrite = () => run("Insurance underwriting (x402)", async () => {
     const r = await post("/api/p2/insurance/underwrite", { asset_id: asset });
     if (r.ok) {
-      note(`✓ Insurance score ${r.data.insurance_score}/100 | Covenant: ${r.data.covenant_state}`);
+      const src = r.data.source === "local-fallback" ? " [local fallback]" : " [x402]";
+      note(`✓ Score ${r.data.insurance_score}/100 | Premium: ${r.data.premium_bps ?? "??"}bps | Coverage: ${r.data.coverage_pct ?? "??"}% | Covenant: ${r.data.covenant_state}${src}`);
     } else {
       note(`✗ ${r.data.error}`);
     }
@@ -121,9 +122,11 @@ export default function Phase2Dashboard() {
       vote_upheld: upheld,
     });
     if (r.ok) {
-      note(r.data.resolved
-        ? `✓ Vote cast by ${arb_id} → Challenge #${open.challenge_id} auto-resolved (upheld=${r.data.upheld})`
-        : `✓ Vote cast by ${arb_id} (${r.data.upheld_votes}/${r.data.needed} needed)`);
+      if (r.data.resolved) {
+        note(`✓ Challenge #${open.challenge_id} auto-resolved — upheld=${r.data.upheld} (${r.data.upheld_votes}/${r.data.needed} votes)`);
+      } else {
+        note(`✓ Vote cast by ${arb_id} — ${r.data.upheld_votes ?? 1}/${r.data.needed ?? 2} votes cast`);
+      }
     } else {
       note(`✗ ${r.data.error}`);
     }
