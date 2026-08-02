@@ -146,9 +146,4 @@ verifyRouter.post("/", async (req, res) => {
       }
 
     res.json({ status: "processing", asset_id });
-  } catch (e) {
-    res.status(502).json({
-      error: `verification failed: ${(e as Error).message}`,
-    });
-  }
 });
