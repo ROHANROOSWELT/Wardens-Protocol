@@ -214,8 +214,9 @@ class WardensChainClient {
     evidence_hash: string;
   }): Promise<TxRecord> {
     assertChainMode();
-    const { syncAssetFromChain, trackAssetLocally, persistTransaction } = await import("./chainSync.ts");
+    const { syncAssetFromChain, trackAssetLocally, persistTransaction, lockAssetSync } = await import("./chainSync.ts");
     trackAssetLocally(a.asset_id);
+    lockAssetSync(a.asset_id);
 
     // Submit synchronously to real Casper Testnet so ONLY genuine on-chain hashes are ever returned
     const { deployHash } = await runLivenetCmd([
@@ -228,7 +229,7 @@ class WardensChainClient {
       a.evidence_hash,
     ]);
     console.log(`[casperClient] ✓ Asset ${a.asset_id} on-chain: ${deployHash}`);
-    await syncAssetFromChain(a.asset_id);
+    syncAssetFromChain(a.asset_id).catch(console.error);
 
     const now = Date.now();
     this.assets.set(a.asset_id, {
@@ -326,8 +327,9 @@ class WardensChainClient {
     const scoreIdMatch = stdout.match(/SCORE_ID=(\d+)/);
     const score_id = scoreIdMatch ? Number(scoreIdMatch[1]) : 0;
 
-    const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
-    await syncAssetFromChain(s.asset_id);
+    const { syncAssetFromChain, persistTransaction, lockAssetSync } = await import("./chainSync.ts");
+    lockAssetSync(s.asset_id);
+    syncAssetFromChain(s.asset_id).catch(console.error);
 
     const tx: TxRecord = {
       action: "submit_score",
@@ -374,15 +376,17 @@ class WardensChainClient {
       asset_id,
       collateral_value.toString(),
     ]);
-    const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
-    await syncAssetFromChain(asset_id);
+    const { syncAssetFromChain, persistTransaction, lockAssetSync } = await import("./chainSync.ts");
+    lockAssetSync(asset_id);
+    syncAssetFromChain(asset_id).catch(console.error);
 
     const asset = this.assets.get(asset_id);
     const ltv = asset ? ltvForScore(asset.current_score) : 0;
+    const existing = this.positions.get(asset_id);
     this.positions.set(asset_id, {
       asset_id,
-      collateral_value,
-      borrowed_amount: 0,
+      collateral_value: (existing?.collateral_value || 0) + collateral_value,
+      borrowed_amount: existing?.borrowed_amount || 0,
       current_ltv: ltv,
       frozen: asset?.status === "Frozen" || ltv === 0,
     });
@@ -418,11 +422,24 @@ class WardensChainClient {
       asset_id,
       amount.toString(),
     ]);
-    const { syncAssetFromChain, persistTransaction } = await import("./chainSync.ts");
-    await syncAssetFromChain(asset_id);
+    const { syncAssetFromChain, persistTransaction, lockAssetSync } = await import("./chainSync.ts");
+    lockAssetSync(asset_id);
+    syncAssetFromChain(asset_id).catch(console.error);
 
     const pos = this.positions.get(asset_id);
-    if (pos) pos.borrowed_amount += amount;
+    const asset = this.assets.get(asset_id);
+    const ltv = asset ? ltvForScore(asset.current_score) : 0;
+    if (pos) {
+      pos.borrowed_amount += amount;
+    } else {
+      this.positions.set(asset_id, {
+        asset_id,
+        collateral_value: 0,
+        borrowed_amount: amount,
+        current_ltv: ltv,
+        frozen: asset?.status === "Frozen" || ltv === 0,
+      });
+    }
 
     const tx: TxRecord = {
       action: "borrow",
@@ -453,9 +470,10 @@ class WardensChainClient {
     // Use chain-returned ID if available, otherwise derive a local sequential ID.
     const chainChallengeId = challengeIdMatch ? Number(challengeIdMatch[1]) : 0;
 
-    const { syncAssetFromChain, persistTransaction, persistAllState } = await import("./chainSync.ts");
+    const { syncAssetFromChain, persistTransaction, persistAllState, lockAssetSync } = await import("./chainSync.ts");
     const score = this.scores.get(c.score_id);
     const assetId = score ? score.asset_id : "";
+    if (assetId) lockAssetSync(assetId);
 
     // ── Optimistic insert ──────────────────────────────────────────────────
     // Add the challenge to the read-model immediately after TX confirmation
@@ -482,7 +500,7 @@ class WardensChainClient {
     persistAllState(); // flush to disk immediately — survives restarts
 
     // Best-effort live sync to refine with actual chain state.
-    if (assetId) await syncAssetFromChain(assetId);
+    if (assetId) syncAssetFromChain(assetId).catch(console.error);
 
     const tx: TxRecord = {
       action: "open_challenge",
@@ -502,7 +520,7 @@ class WardensChainClient {
       challenge_id.toString(),
       upheld.toString(),
     ]);
-    const { syncAssetFromChain, persistTransaction, persistAllState } = await import("./chainSync.ts");
+    const { syncAssetFromChain, persistTransaction, persistAllState, lockAssetSync } = await import("./chainSync.ts");
     const ch = this.challenges.get(challenge_id);
     if (ch) {
       ch.status = upheld ? "Upheld" : "Rejected";
@@ -510,7 +528,8 @@ class WardensChainClient {
       persistAllState();
     }
     const assetId = ch ? ch.asset_id : "";
-    if (assetId) await syncAssetFromChain(assetId);
+    if (assetId) lockAssetSync(assetId);
+    if (assetId) syncAssetFromChain(assetId).catch(console.error);
 
     const tx: TxRecord = {
       action: "resolve_challenge",

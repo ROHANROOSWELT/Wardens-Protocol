@@ -6,7 +6,7 @@ export default function AgentNetwork() {
   const [agents, setAgents] = useState<any[]>([]);
   useEffect(() => {
     const load = () => getAgents().then(setAgents);
-    load(); const i = setInterval(load, 3000); return () => clearInterval(i);
+    load(); const i = setInterval(load, 500); return () => clearInterval(i);
   }, []);
 
   const bonded = agents.reduce((s, a) => s + (a.bonded_amount ?? 0), 0);

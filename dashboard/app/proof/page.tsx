@@ -16,7 +16,7 @@ export default function ProofLedger() {
 
   useEffect(() => {
     const load = () => Promise.all([getTransactions(), getChainInfo()]).then(([t, c]) => { setTxs(t); setChain(c); });
-    load(); const i = setInterval(load, 3000); return () => clearInterval(i);
+    load(); const i = setInterval(load, 500); return () => clearInterval(i);
   }, []);
 
   const rows = useMemo(() => txs.slice().reverse().filter((t) => FILTERS[filter](t.action)), [txs, filter]);

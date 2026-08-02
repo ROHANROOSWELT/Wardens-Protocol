@@ -73,7 +73,7 @@ export default function Phase2Dashboard() {
     }
   }, [asset]);
 
-  useEffect(() => { refresh(); const i = setInterval(refresh, 5000); return () => clearInterval(i); }, [refresh]);
+  useEffect(() => { refresh(); const i = setInterval(refresh, 500); return () => clearInterval(i); }, [refresh]);
 
   async function run(label: string, fn: () => Promise<void>) {
     setBusy(true);

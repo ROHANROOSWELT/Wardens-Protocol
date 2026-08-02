@@ -36,7 +36,7 @@ export default function VaultRegistry() {
         return prev;
       });
     });
-    load(); const i = setInterval(load, 3000); return () => clearInterval(i);
+    load(); const i = setInterval(load, 500); return () => clearInterval(i);
   }, []);
 
   const submitForm = async (e: React.FormEvent) => {

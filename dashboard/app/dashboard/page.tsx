@@ -61,7 +61,7 @@ export default function ControlRoom() {
     setAssets(a); setAgents(g); setTxs(t); setChain(c); setSel(s);
   }, [asset]);
 
-  useEffect(() => { refresh(); const i = setInterval(refresh, 3000); return () => clearInterval(i); }, [refresh]);
+  useEffect(() => { refresh(); const i = setInterval(refresh, 500); return () => clearInterval(i); }, [refresh]);
 
   useEffect(() => {
     if (!asset && assets.length > 0) setAsset(assets[0].asset_id);

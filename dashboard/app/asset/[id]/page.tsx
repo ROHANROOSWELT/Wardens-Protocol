@@ -12,7 +12,7 @@ export default function AssetDetail() {
   const [s, setS] = useState<any>(null);
   useEffect(() => {
     const load = () => getDashboard(id).then(setS);
-    load(); const i = setInterval(load, 3000); return () => clearInterval(i);
+    load(); const i = setInterval(load, 500); return () => clearInterval(i);
   }, [id]);
 
   if (!s) return <div className="p-margin-desktop max-w-7xl mx-auto text-body-lg text-on-surface-variant">Loading {id}… (is the backend running on :4000?)</div>;

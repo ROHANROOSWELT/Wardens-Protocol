@@ -14,6 +14,12 @@ import { casper, type Asset, type Agent, type Challenge, type TrustScore, type V
 import { setLastScoreId } from "./store.ts";
 import type { AssetStatus } from "./scoreEngine.ts";
 
+const optimisticLocks = new Map<string, number>();
+
+export function lockAssetSync(assetId: string) {
+  if (assetId) optimisticLocks.set(assetId, Date.now());
+}
+
 const ROOT = fileURLToPath(new URL("../../..", import.meta.url)); // repo root
 const CONTRACT_DIR = `${ROOT}/contracts/wardens_core`;
 const RELEASE_BIN = `${CONTRACT_DIR}/target/release/wardens_livenet`;
@@ -307,7 +313,14 @@ function resolveSecretKeyPath(): string {
 }
 
 /** Read one asset's live on-chain state (+ demo agents/challenges) into the model. */
-export function syncAssetFromChain(assetId: string): Promise<{ ok: boolean; error?: string }> {
+export function syncAssetFromChain(assetId: string, force = false): Promise<{ ok: boolean; error?: string }> {
+  if (!force && assetId) {
+    const lock = optimisticLocks.get(assetId) || 0;
+    if (Date.now() - lock < 90000) {
+      console.log(`[chainSync] Skipping sync for ${assetId} due to active optimistic lock (waiting for block inclusion).`);
+      return Promise.resolve({ ok: true });
+    }
+  }
   const addr = contractAddress();
   if (!addr) return Promise.resolve({ ok: false, error: "WARDENS_CORE_ADDRESS not set — deploy first (scripts/deploy_chain.sh)" });
   const bin = getLivenetBin();

@@ -9,7 +9,7 @@ export default function ChallengeCourt() {
   const [msg, setMsg] = useState("");
 
   const refresh = useCallback(() => { getChallenges().then(setChallenges); }, []);
-  useEffect(() => { refresh(); const i = setInterval(refresh, 3000); return () => clearInterval(i); }, [refresh]);
+  useEffect(() => { refresh(); const i = setInterval(refresh, 500); return () => clearInterval(i); }, [refresh]);
 
   const open = challenges.filter((c) => c.status === "Open");
   const ledger = challenges.filter((c) => c.status !== "Open");
