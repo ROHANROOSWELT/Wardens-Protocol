@@ -460,7 +460,11 @@ class WardensChainClient {
   }): Promise<TxRecord & { challenge_id: number }> {
     assertChainMode();
     const score = this.scores.get(c.score_id);
-    if (score && Date.now() > score.challenge_deadline) {
+    if (!score) {
+      throw new Error("ScoreNotFound (User error: 7)");
+    }
+    // Add a 60-second buffer to account for Casper testnet block inclusion time.
+    if (Date.now() + 60000 > score.challenge_deadline) {
       throw new Error("ChallengeWindowClosed (User error: 8)");
     }
     const { stdout, deployHash } = await runLivenetCmd([
@@ -519,7 +523,10 @@ class WardensChainClient {
   async resolveChallenge(challenge_id: number, upheld: boolean): Promise<TxRecord> {
     assertChainMode();
     const ch = this.challenges.get(challenge_id);
-    if (ch && ch.status !== "Open") {
+    if (!ch) {
+      throw new Error("ChallengeNotFound (User error: 9)");
+    }
+    if (ch.status !== "Open") {
       throw new Error("ChallengeAlreadyResolved (User error: 10)");
     }
     const { deployHash } = await runLivenetCmd([
