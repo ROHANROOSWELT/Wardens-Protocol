@@ -475,7 +475,6 @@ class WardensChainClient {
     const chainChallengeId = challengeIdMatch ? Number(challengeIdMatch[1]) : 0;
 
     const { syncAssetFromChain, persistTransaction, persistAllState, lockAssetSync } = await import("./chainSync.ts");
-    const score = this.scores.get(c.score_id);
     const assetId = score ? score.asset_id : "";
     if (assetId) lockAssetSync(assetId);
 
@@ -529,7 +528,6 @@ class WardensChainClient {
       upheld.toString(),
     ]);
     const { syncAssetFromChain, persistTransaction, persistAllState, lockAssetSync } = await import("./chainSync.ts");
-    const ch = this.challenges.get(challenge_id);
     if (ch) {
       ch.status = upheld ? "Upheld" : "Rejected";
       ch.resolved_at = Date.now();
