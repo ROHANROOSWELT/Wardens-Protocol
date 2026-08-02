@@ -5,6 +5,7 @@ import { getChallenges, post } from "../../lib/api";
 export default function ChallengeCourt() {
   const [challenges, setChallenges] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
+  const [resolvingId, setResolvingId] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
 
   const refresh = useCallback(() => { getChallenges().then(setChallenges); }, []);
@@ -16,8 +17,11 @@ export default function ChallengeCourt() {
 
   const resolve = async (id: number, upheld: boolean) => {
     setBusy(true);
+    setResolvingId(id);
+    setMsg(`Processing transaction on Casper testnet... Please wait ~30-60 seconds for block inclusion.`);
     const r = await post("/api/challenge/resolve", { challenge_id: id, upheld });
-    setMsg(r.ok ? `Challenge #${id} ${upheld ? "UPHELD — verifier slashed" : "REJECTED — challenger loses bond"}` : `Error: ${r.data.error}`);
+    setMsg(r.ok ? `Challenge #${id} ${upheld ? "UPHELD" : "REJECTED"}. Transaction confirmed on-chain and moved to Justice Ledger.` : `Error: ${r.data.error}`);
+    setResolvingId(null);
     refresh(); setBusy(false);
   };
 
@@ -48,10 +52,16 @@ export default function ChallengeCourt() {
       <div className="md:col-span-8 flex flex-col gap-lg">
         <h2 className="text-headline-md uppercase border-b-[4px] border-on-surface pb-xs">Active Disputes</h2>
         {open.length === 0 && <div className="neo-border bg-surface p-md text-on-surface-variant italic">No active disputes. The court is quiet.</div>}
-        {open.map((c) => (
-          <div key={c.challenge_id} className="neo-border neo-shadow bg-surface p-md flex flex-col gap-md">
+        {open.map((c) => {
+          const isResolving = resolvingId === c.challenge_id;
+          return (
+          <div key={c.challenge_id} className={`neo-border neo-shadow bg-surface p-md flex flex-col gap-md ${isResolving ? 'opacity-70' : ''}`}>
             <div className="flex items-center gap-sm">
-              <div className="bg-error text-on-error px-xs py-base text-label-md uppercase border-2 border-on-surface">Open</div>
+              {isResolving ? (
+                <div className="bg-surface-variant text-on-surface px-xs py-base text-label-md uppercase border-2 border-on-surface">Processing...</div>
+              ) : (
+                <div className="bg-error text-on-error px-xs py-base text-label-md uppercase border-2 border-on-surface">Open</div>
+              )}
               <div className="font-mono-plex font-bold">CHALLENGE #{c.challenge_id} · {c.asset_id}</div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-md">
@@ -73,11 +83,15 @@ export default function ChallengeCourt() {
               </div>
             </div>
             <div className="flex gap-sm">
-              <button disabled={busy} onClick={() => resolve(c.challenge_id, true)} className="border-[3px] border-on-surface bg-error text-on-error text-label-md uppercase tracking-widest px-md py-xs neobrutalist-btn disabled:opacity-50">Uphold + Slash</button>
-              <button disabled={busy} onClick={() => resolve(c.challenge_id, false)} className="border-[3px] border-on-surface bg-surface text-label-md uppercase tracking-widest px-md py-xs neobrutalist-btn disabled:opacity-50">Reject</button>
+              <button disabled={busy} onClick={() => resolve(c.challenge_id, true)} className="border-[3px] border-on-surface bg-error text-on-error text-label-md uppercase tracking-widest px-md py-xs neobrutalist-btn disabled:opacity-50">
+                {isResolving ? "Slashing..." : "Uphold + Slash"}
+              </button>
+              <button disabled={busy} onClick={() => resolve(c.challenge_id, false)} className="border-[3px] border-on-surface bg-surface text-label-md uppercase tracking-widest px-md py-xs neobrutalist-btn disabled:opacity-50">
+                {isResolving ? "Processing..." : "Reject"}
+              </button>
             </div>
           </div>
-        ))}
+        )})}
       </div>
 
       {/* Justice ledger */}

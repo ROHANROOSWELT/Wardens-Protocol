@@ -67,8 +67,7 @@ module.exports = {
 };
 PM2EOF
 
-  echo "--> Resetting all local storage (tracked assets, transactions, and cache) to start clean..."
-  rm -rf ~/wardens/backend/.local/* 2>/dev/null || true
+  echo "--> Preserving local storage (tracked assets, transactions, and cache)..."
 
   echo "--> Launching entire ecosystem in the background!"
   pm2 delete all 2>/dev/null || true
