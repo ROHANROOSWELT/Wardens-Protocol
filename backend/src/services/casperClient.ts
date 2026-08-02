@@ -459,6 +459,10 @@ class WardensChainClient {
     counter_bond: number;
   }): Promise<TxRecord & { challenge_id: number }> {
     assertChainMode();
+    const score = this.scores.get(c.score_id);
+    if (score && Date.now() > score.challenge_deadline) {
+      throw new Error("ChallengeWindowClosed (User error: 8)");
+    }
     const { stdout, deployHash } = await runLivenetCmd([
       "open_challenge",
       c.score_id.toString(),
@@ -515,6 +519,10 @@ class WardensChainClient {
 
   async resolveChallenge(challenge_id: number, upheld: boolean): Promise<TxRecord> {
     assertChainMode();
+    const ch = this.challenges.get(challenge_id);
+    if (ch && ch.status !== "Open") {
+      throw new Error("ChallengeAlreadyResolved (User error: 10)");
+    }
     const { deployHash } = await runLivenetCmd([
       "resolve_challenge",
       challenge_id.toString(),
