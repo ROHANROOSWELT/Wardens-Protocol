@@ -8,6 +8,12 @@ agentsRouter.post("/register", async (req, res) => {
   try {
     const { agent_id, role } = req.body ?? {};
     if (!agent_id || !role) return res.status(400).json({ error: "agent_id and role required" });
+    
+    // Check local read-model first to avoid a reverted transaction on-chain
+    if (casper.agents.has(agent_id)) {
+      return res.json({ deploy_hash: "", agent_id, role, already_registered: true });
+    }
+
     const tx = await casper.registerAgent(agent_id, role);
     res.json({ deploy_hash: tx.deploy_hash, agent_id, role });
   } catch (e) {
