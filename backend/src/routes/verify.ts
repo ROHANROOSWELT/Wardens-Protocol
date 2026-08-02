@@ -51,7 +51,6 @@ verifyRouter.post("/manual", async (req, res) => {
     if (asset_id === undefined || score === undefined)
       return res.status(400).json({ error: "asset_id and score required" });
       
-    (async () => {
       try {
         const evidence_hash = canonicalizeAndHash({ asset_id, score, manual: true });
         const explanation = `Verifier posted score ${score}.`;
@@ -61,8 +60,8 @@ verifyRouter.post("/manual", async (req, res) => {
         setLastScoreId(asset_id, tx.score_id);
       } catch (e) {
         console.error(`[verify manual] error:`, e);
+        return res.status(500).json({ error: "Failed to submit score" });
       }
-    })();
     
     res.json({ status: "processing", asset_id, score: Number(score) });
   } catch (e) {
@@ -78,8 +77,6 @@ verifyRouter.post("/", async (req, res) => {
   const assetData = casper.assets.get(asset_id);
   if (!assetData) return res.status(404).json({ error: "asset not found on chain" });
 
-  try {
-    (async () => {
       try {
         // Three x402-paid verifier calls (Section 8).
         const parserCall = await x402Post<VerifierResult>(`${PARSER}/verify/parse`, {
@@ -145,8 +142,8 @@ verifyRouter.post("/", async (req, res) => {
         setLastScoreId(asset_id, tx.score_id);
       } catch (e) {
         console.error(`[verify] error for ${asset_id}:`, e);
+        return res.status(500).json({ error: "Failed to submit score" });
       }
-    })();
 
     res.json({ status: "processing", asset_id });
   } catch (e) {
