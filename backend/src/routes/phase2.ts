@@ -235,7 +235,7 @@ phase2Router.post("/reserve/tranche", async (req, res) => {
       if (!match) return res.status(502).json({ error: "No TRANCHE_ID in contract output", raw: stdout.slice(-400) });
       const tranche_id = Number(match[1]);
       // Mirror into off-chain state so reads are instant.
-      tranches.set(tranche_id, { asset_id, amount: Number(amount ?? 0), released: false, blocked: false });
+      tranches.set(tranche_id, { asset_id, amount: Number(amount ?? 0), released: false, blocked: false, deploy_hash: deployHash });
       if (tranche_id > trancheSeq) trancheSeq = tranche_id;
       saveP2State();
       res.json({ tranche_id, asset_id, amount, on_chain: true, deploy_hash: deployHash });
@@ -273,6 +273,7 @@ phase2Router.post("/reserve/release", async (req, res) => {
       if (!hash) return res.status(500).json({ error: "WARDENS_RESERVE_VAULT_HASH not configured" });
       const { deployHash } = await runPhase2LivenetCmd(["call", "ReserveVault", hash, "release_tranche", String(tranche_id), "true"]);
       tr.released = true;
+      tr.deploy_hash = deployHash; // update with release hash
       tranches.set(Number(tranche_id), tr);
       saveP2State();
       res.json({ ok: true, tranche_id, asset_id: tr.asset_id, amount: tr.amount, on_chain: true, deploy_hash: deployHash, message: "Tranche released on-chain — CovenantEngine: FullAccess" });
@@ -309,7 +310,7 @@ phase2Router.post("/privacy/commit", async (req, res) => {
       if (!match) return res.status(502).json({ error: "No COMMITMENT_ID in contract output", raw: stdout.slice(-400) });
       const commitment_id = Number(match[1]);
       // Mirror into off-chain state for instant reads.
-      commitments.set(commitment_id, { asset_id, committer: committer ?? "anonymous", merkle_root, revealed: false, reveal_hash: "" });
+      commitments.set(commitment_id, { asset_id, committer: committer ?? "anonymous", merkle_root, revealed: false, reveal_hash: "", deploy_hash: deployHash });
       if (commitment_id > commitSeq) commitSeq = commitment_id;
       saveP2State();
       res.json({ commitment_id, asset_id, merkle_root, on_chain: true, deploy_hash: deployHash, message: "Commitment stored on-chain (Merkle root only)" });
@@ -342,6 +343,7 @@ phase2Router.post("/privacy/reveal", async (req, res) => {
       }
       c.revealed = true;
       c.reveal_hash = reveal_hash;
+      c.reveal_deploy_hash = deployHash;
       commitments.set(Number(commitment_id), c);
       saveP2State();
       res.json({ ok: true, commitment_id, revealed: true, on_chain: false });

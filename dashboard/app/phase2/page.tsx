@@ -11,16 +11,16 @@ async function getJson<T>(path: string, fb: T): Promise<T> {
 
 const covenantColor = (state: string) =>
   state === "FullAccess" ? "#2FD98A" :
-  state === "Monitored"  ? "#f5a623" :
-  state === "DrawsFrozen" ? "#f55a23" : "#ba1a1a";
+    state === "Monitored" ? "#f5a623" :
+      state === "DrawsFrozen" ? "#f55a23" : "#ba1a1a";
 
 const covenantIcon = (state: string) =>
   state === "FullAccess" ? "verified" :
-  state === "Monitored" ? "visibility" :
-  state === "DrawsFrozen" ? "lock" : "emergency";
+    state === "Monitored" ? "visibility" :
+      state === "DrawsFrozen" ? "lock" : "emergency";
 
-type Tranche = { tranche_id: number; asset_id: string; amount: number; released: boolean; blocked: boolean };
-type Commitment = { commitment_id: number; asset_id: string; committer: string; merkle_root: string; revealed: boolean };
+type Tranche = { tranche_id: number; asset_id: string; amount: number; released: boolean; blocked: boolean; deploy_hash?: string };
+type Commitment = { commitment_id: number; asset_id: string; committer: string; merkle_root: string; revealed: boolean; deploy_hash?: string };
 type Vote = { agent_id: string; vote: boolean };
 
 export default function Phase2Dashboard() {
@@ -49,7 +49,7 @@ export default function Phase2Dashboard() {
       getAssets(),
     ]);
     setChain(c); setCovenant(cov); setTranches(tr); setCommitments(cm); setPrices(pr);
-    
+
     setDebugError(`Fetched ${aList.length} assets. Cov is ${cov ? 'ok' : 'null'}.`);
     // update dynamic asset list 
     const fetchedIds = aList.map((a: any) => a.asset_id);
@@ -128,7 +128,7 @@ export default function Phase2Dashboard() {
     const allAgents = await getJson<any[]>("/api/agents", []);
     const arbAgent = allAgents.find((a: any) =>
       a.active && (a.role === "Challenger" || a.role === "challenger" ||
-                   a.role === "Aggregator" || a.role === "aggregator")
+        a.role === "Aggregator" || a.role === "aggregator")
     );
     if (!arbAgent) return note("✗ No active registered agent available to cast vote");
     const arb_id = arbAgent.agent_id;
@@ -249,10 +249,17 @@ export default function Phase2Dashboard() {
           <div className="flex flex-col gap-xs max-h-[180px] overflow-auto">
             {tranches.length === 0 && <div className="text-on-surface-variant text-body-sm">No tranches yet.</div>}
             {tranches.map((t) => (
-              <div key={t.tranche_id} className={`flex justify-between border-[2px] px-sm py-xs text-body-sm font-mono-plex ${t.released ? "border-[#2FD98A] bg-[#2FD98A]/10" : t.blocked ? "border-error bg-error/10" : "border-on-surface"}`}>
-                <span>Tranche #{t.tranche_id}</span>
-                <span>{t.amount} CSPR</span>
-                <span className="uppercase font-bold">{t.released ? "Released" : t.blocked ? "Blocked" : "Pending"}</span>
+              <div key={t.tranche_id} className={`flex flex-col border-[2px] px-sm py-xs text-body-sm font-mono-plex gap-1 ${t.released ? "border-[#2FD98A] bg-[#2FD98A]/10" : t.blocked ? "border-error bg-error/10" : "border-on-surface"}`}>
+                <div className="flex justify-between">
+                  <span>Tranche #{t.tranche_id}</span>
+                  <span>{t.amount} CSPR</span>
+                  <span className="uppercase font-bold">{t.released ? "Released" : t.blocked ? "Blocked" : "Pending"}</span>
+                </div>
+                {t.deploy_hash && (
+                  <div className="text-[10px] text-on-surface-variant truncate">
+                    TX: <a href={explorerLink(t.deploy_hash)} target="_blank" className="underline hover:text-primary text-primary/80">{t.deploy_hash}</a>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -282,12 +289,17 @@ export default function Phase2Dashboard() {
           <div className="flex flex-col gap-xs max-h-[180px] overflow-auto">
             {commitments.length === 0 && <div className="text-on-surface-variant text-body-sm">No commitments yet.</div>}
             {commitments.map((c) => (
-              <div key={c.commitment_id} className={`border-[2px] px-sm py-xs text-body-sm font-mono-plex ${c.revealed ? "border-[#2FD98A]" : "border-on-surface"}`}>
+              <div key={c.commitment_id} className={`border-[2px] px-sm py-xs text-body-sm font-mono-plex flex flex-col gap-1 ${c.revealed ? "border-[#2FD98A]" : "border-on-surface"}`}>
                 <div className="flex justify-between">
                   <span>#{c.commitment_id} — {c.committer}</span>
                   <span className={`uppercase font-bold ${c.revealed ? "text-[#2FD98A]" : ""}`}>{c.revealed ? "Revealed" : "Hidden"}</span>
                 </div>
                 <div className="text-on-surface-variant truncate">{c.merkle_root}</div>
+                {c.deploy_hash && (
+                  <div className="text-[10px] text-on-surface-variant truncate">
+                    TX: <a href={explorerLink(c.deploy_hash)} target="_blank" className="underline hover:text-primary text-primary/80">{c.deploy_hash}</a>
+                  </div>
+                )}
               </div>
             ))}
           </div>
